@@ -1,0 +1,18 @@
+SYNTHETIC INVOICE SAMPLE
+
+Vendor: Sunrise Home Services
+Region: India
+Invoice number: INV-2026-0607
+GSTIN: 29ABCDE1234F1Z5
+UPI reference: UPI0000607001
+
+Items:
+- Home safety inspection, HSN/SAC 9987, quantity 1, amount INR 1,000.00
+- Reading lamp installation, HSN/SAC 9954, quantity 1, amount INR 500.00
+
+Subtotal: INR 1,500.00
+CGST 9%: INR 135.00
+SGST 9%: INR 135.00
+Total: INR 1,770.00
+
+This is synthetic demo data and does not represent a real person or business.

@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "local-lm dataset registry entry",
+  "type": "object",
+  "required": [
+    "name",
+    "license",
+    "region",
+    "country",
+    "language",
+    "modality",
+    "task",
+    "pii_metadata"
+  ],
+  "properties": {
+    "name": { "type": "string", "minLength": 1 },
+    "license": { "type": "string", "minLength": 1 },
+    "region": { "type": "string", "minLength": 1 },
+    "country": { "type": "string", "minLength": 1 },
+    "language": { "type": "string", "minLength": 1 },
+    "modality": { "type": "string", "minLength": 1 },
+    "task": { "type": "string", "minLength": 1 },
+    "pii_metadata": {
+      "type": "object",
+      "required": ["contains_pii", "source", "handling"],
+      "properties": {
+        "contains_pii": { "type": "boolean" },
+        "source": { "type": "string", "minLength": 1 },
+        "handling": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

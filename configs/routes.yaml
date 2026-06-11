@@ -1,0 +1,55 @@
+runtime:
+  local_only: true
+  privacy_mode: strict
+  allow_web: false
+  allow_external_apis: false
+  allow_remote_inference: false
+  allow_remote_file_uploads: false
+  telemetry_enabled: false
+services:
+  text:
+    provider: local
+    endpoint: http://127.0.0.1:8081
+    kind: llama_cpp
+  vision:
+    provider: local
+    endpoint: http://127.0.0.1:8082
+    kind: llama_cpp_or_transformers
+  omni:
+    provider: local
+    endpoint: http://127.0.0.1:8083
+    kind: optional_omni
+    optional: true
+  asr:
+    provider: local
+    endpoint: http://127.0.0.1:8090
+    kind: parakeet
+routes:
+  general_local_assistant:
+    provider: local
+    model_key: text
+    endpoint: http://127.0.0.1:8081
+  summarize_url:
+    provider: local
+    model_key: text
+    endpoint: http://127.0.0.1:8081
+  summarize_wikipedia:
+    provider: local
+    model_key: text
+    endpoint: http://127.0.0.1:8081
+  document_to_excel:
+    provider: local
+    model_key: vision
+    endpoint: http://127.0.0.1:8082
+  describe_image:
+    provider: local
+    model_key: vision
+    endpoint: http://127.0.0.1:8082
+  translate_image_text:
+    provider: local
+    model_key: vision
+    endpoint: http://127.0.0.1:8082
+  speech_to_text:
+    provider: local
+    model_key: asr
+    endpoint: http://127.0.0.1:8090

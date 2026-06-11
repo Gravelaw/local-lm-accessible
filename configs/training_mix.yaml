@@ -1,0 +1,35 @@
+training:
+  implemented: false
+  allowed_frameworks:
+    - PyTorch
+    - Transformers
+    - TRL
+    - PEFT
+    - LLaMA-Factory
+    - SWIFT
+    - NeMo
+  focus_regions:
+    - India
+    - Southeast Asia
+    - North America
+    - Europe
+dataset_policy:
+  required_metadata:
+    - license
+    - region
+    - country
+    - language
+    - modality
+    - task
+    - pii_metadata
+  reject_unknown_license: true
+  reject_missing_metadata: true
+  blocked_real_document_types:
+    - financial
+    - medical
+    - legal
+    - identity
+  allowed_document_conditions:
+    - synthetic
+    - redacted
+    - explicit_user_opt_in

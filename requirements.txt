@@ -1,0 +1,13 @@
+gradio==6.16.0
+fastapi>=0.115
+uvicorn>=0.30
+pydantic>=2.8
+pyyaml>=6.0
+openpyxl>=3.1
+pillow>=10.0
+opencv-python-headless>=4.9
+faker>=25.0
+babel>=2.14
+jinja2>=3.1
+reportlab>=4.0
+httpx>=0.28

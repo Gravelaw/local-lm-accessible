@@ -1,0 +1,58 @@
+# Python/runtime caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# Local virtual environments
+.venv/
+venv/
+env/
+
+# Local service state
+.local_logs/
+.local_pids/
+*.log
+
+# Downloaded model artifacts. Keep metadata tracked.
+models/text/
+models/vision/
+models/asr/
+models/omni/
+!models/manifest.json
+!models/README.md
+
+# Large or generated data artifacts
+data/raw/*
+!data/raw/README.md
+data/processed/*
+!data/processed/README.md
+data/synthetic/generated/
+data/synthetic/invoices/
+data/synthetic/receipts/
+data/synthetic/bank_statements/
+data/synthetic/handwritten_notes/
+
+# Generated reports and eval outputs
+reports/
+
+# Training/output artifacts
+training/**/outputs/
+training/**/runs/
+training/**/checkpoints/
+training/**/merged/
+training/**/*.gguf
+training/**/*.safetensors
+training/**/*.bin
+
+# Local exports and temporary files
+*.tmp
+*.bak
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm

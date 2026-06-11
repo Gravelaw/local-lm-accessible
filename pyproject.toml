@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "local-lm-accessible"
+version = "0.1.0"
+description = "Local-first accessible small-model assistant for elderly and low-vision users."
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn>=0.30",
+  "pydantic>=2.8",
+  "pyyaml>=6.0",
+  "openpyxl>=3.1",
+  "pillow>=10.0",
+  "opencv-python-headless>=4.9",
+  "faker>=25.0",
+  "babel>=2.14",
+  "jinja2>=3.1",
+  "reportlab>=4.0",
+  "gradio==6.16.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "ruff>=0.6",
+]
+training = [
+  "transformers>=4.46",
+  "datasets>=2.20",
+  "accelerate>=0.34",
+  "peft>=0.12",
+  "trl>=0.11",
+  "bitsandbytes>=0.43",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["data*", "evals*", "scripts*", "services*", "training*"]
+namespaces = true
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]

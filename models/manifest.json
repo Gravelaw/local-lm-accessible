@@ -1,0 +1,170 @@
+{
+  "version": "0.2.0",
+  "local_only": true,
+  "privacy_mode": "strict",
+  "allowed_vendors": [
+    "OpenBMB",
+    "NVIDIA",
+    "Cohere",
+    "BFL"
+  ],
+  "models": [
+    {
+      "key": "text",
+      "model_name": "NVIDIA Nemotron 3 Nano 4B GGUF",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-4B-GGUF",
+      "vendor": "NVIDIA",
+      "base_params": 4000000000,
+      "adapter_params": 0,
+      "quantization": "Q4_K_M",
+      "local_path": "models/text/NVIDIA-Nemotron3-Nano-4B-Q4_K_M.gguf",
+      "sha256": "be5d9a656a51922f24f1f09a759cebb694e1f5d9728bf0ef9f8c972c5a0b5ef2",
+      "license": "NVIDIA Nemotron Open Model License",
+      "runtime": "llama.cpp",
+      "port": 8081,
+      "tasks": [
+        "route_task",
+        "summarize_wikipedia",
+        "summarize_web_page",
+        "general_local_assistant"
+      ],
+      "supported_languages": [
+        "en"
+      ],
+      "unsupported_languages": [],
+      "commercial_status": "allowed",
+      "notes": "Downloaded from the official NVIDIA GGUF repository. HF model card says the model is ready for commercial use under the NVIDIA Nemotron Open Model License. Deployment target is local GGUF through llama.cpp."
+    },
+    {
+      "key": "vision",
+      "model_name": "MiniCPM-V 4.6 GGUF",
+      "model_id": "openbmb/MiniCPM-V-4.6-gguf",
+      "vendor": "OpenBMB",
+      "base_params": 8000000000,
+      "adapter_params": 0,
+      "quantization": "Q4_K_M",
+      "local_path": "models/vision/MiniCPM-V-4_6-Q4_K_M.gguf",
+      "sha256": "6b0c74962c44bc6bf4b655b9b02c13eda9d5a0491543ae976d1ac18e4b7892e2",
+      "license": "Apache-2.0",
+      "runtime": "llama.cpp_or_local_transformers",
+      "port": 8082,
+      "additional_artifacts": [
+        {
+          "name": "mmproj",
+          "local_path": "models/vision/mmproj-model-f16.gguf",
+          "sha256": "ca931d861d0801d9003e50697cd764721a334107c0e0415a51168ee1938462de"
+        }
+      ],
+      "tasks": [
+        "invoice_to_json",
+        "invoice_to_excel",
+        "bank_statement_to_transactions",
+        "handwritten_note_to_text",
+        "image_accessibility_description",
+        "image_translation",
+        "describe_image",
+        "translate_image_text"
+      ],
+      "supported_languages": [
+        "en",
+        "hi",
+        "ta",
+        "bn",
+        "mr",
+        "te",
+        "fr",
+        "de",
+        "es",
+        "it",
+        "nl",
+        "pt",
+        "th"
+      ],
+      "unsupported_languages": [],
+      "commercial_status": "allowed",
+      "notes": "Downloaded from the official OpenBMB GGUF repository. llama.cpp vision runtime also requires the mmproj artifact listed in additional_artifacts."
+    },
+    {
+      "key": "omni",
+      "model_name": "Optional local omni model",
+      "model_id": "nvidia/local-omni-placeholder",
+      "vendor": "NVIDIA",
+      "base_params": 0,
+      "adapter_params": 0,
+      "quantization": "optional",
+      "local_path": "models/omni/model.gguf",
+      "sha256": "",
+      "license": "review_required",
+      "runtime": "optional_local_server",
+      "port": 8083,
+      "tasks": [
+        "optional_multimodal_assist"
+      ],
+      "supported_languages": [
+        "en"
+      ],
+      "unsupported_languages": [],
+      "commercial_status": "optional_review_required",
+      "notes": "Optional service. start_all_local.sh skips it unless START_OMNI=1."
+    },
+    {
+      "key": "asr",
+      "model_name": "Parakeet TDT 0.6B v3 ASR",
+      "model_id": "nvidia/parakeet-tdt-0.6b-v3",
+      "vendor": "NVIDIA",
+      "base_params": 600000000,
+      "adapter_params": 0,
+      "quantization": "bf16_or_fp16_local",
+      "local_path": "models/asr/parakeet-tdt-0.6b-v3",
+      "sha256": "180fa7f6973e3faabe3b13ba2267b7a7cfa58b7cadcdc9d258d52fba287d2b57",
+      "license": "CC-BY-4.0",
+      "runtime": "parakeet_service",
+      "port": 8090,
+      "tasks": [
+        "speech_to_text"
+      ],
+      "supported_languages": [
+        "en",
+        "bg",
+        "cs",
+        "da",
+        "de",
+        "el",
+        "es",
+        "et",
+        "fi",
+        "fr",
+        "hr",
+        "hu",
+        "it",
+        "lt",
+        "lv",
+        "mt",
+        "nl",
+        "pl",
+        "pt",
+        "ro",
+        "sk",
+        "sl",
+        "sv",
+        "uk",
+        "ga",
+        "is"
+      ],
+      "unsupported_languages": [
+        "hi",
+        "ta",
+        "bn",
+        "mr",
+        "te",
+        "id",
+        "th",
+        "vi",
+        "ms",
+        "fil"
+      ],
+      "commercial_status": "allowed_with_attribution",
+      "notes": "HF model metadata tags Parakeet v3 as CC-BY-4.0. Indian and Southeast Asian non-English ASR is experimental unless local eval proves usable."
+    }
+  ]
+}

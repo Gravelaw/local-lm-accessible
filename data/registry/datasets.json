@@ -1,0 +1,30 @@
+[
+  {
+    "name": "synthetic_elder_assistant_india_en_hi",
+    "license": "CC-BY-4.0",
+    "region": "India",
+    "country": "India",
+    "language": "en,hi",
+    "modality": "text",
+    "task": "assistant_safety_and_accessibility",
+    "pii_metadata": {
+      "contains_pii": false,
+      "source": "synthetic",
+      "handling": "no real user data"
+    }
+  },
+  {
+    "name": "synthetic_low_vision_forms_na_en",
+    "license": "CC0-1.0",
+    "region": "North America",
+    "country": "United States",
+    "language": "en",
+    "modality": "document",
+    "task": "document_extraction",
+    "pii_metadata": {
+      "contains_pii": false,
+      "source": "synthetic",
+      "handling": "synthetic documents only"
+    }
+  }
+]

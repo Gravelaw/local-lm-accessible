@@ -1,0 +1,33 @@
+runtime:
+  local_only: true
+  allow_remote_inference: false
+  allow_remote_file_uploads: false
+  allow_external_apis: false
+  telemetry_enabled: false
+safety:
+  require_uncertainty_warning_for:
+    - financial
+    - medical
+    - legal
+  require_human_review_warning_for:
+    - financial
+    - medical
+    - legal
+  block_real_documents_without_condition:
+    - financial
+    - medical
+    - legal
+    - identity
+  allowed_document_conditions:
+    - synthetic
+    - redacted
+    - explicit_user_opt_in
+accessibility:
+  target_users:
+    - elderly
+    - low_vision
+  defaults:
+    large_text: true
+    clear_error_messages: true
+    reduced_motion: true
+    keyboard_accessible: true

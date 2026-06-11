@@ -1,0 +1,14 @@
+SYNTHETIC BANK STATEMENT SAMPLE
+
+Account holder: Demo User
+Account: XXXX-XXXX-0123
+Region: North America
+Statement period: 2026-05-01 to 2026-05-31
+
+Transactions:
+2026-05-02 | Opening balance | credit 0.00 | debit 0.00 | balance USD 1,250.00
+2026-05-05 | Grocery store | credit 0.00 | debit 62.45 | balance USD 1,187.55
+2026-05-12 | Pension deposit | credit 900.00 | debit 0.00 | balance USD 2,087.55
+2026-05-21 | Utility bill | credit 0.00 | debit 118.20 | balance USD 1,969.35
+
+This is synthetic demo data. Any bank-statement conversion must require human review.

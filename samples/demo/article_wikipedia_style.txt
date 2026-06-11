@@ -1,0 +1,5 @@
+Local-first assistive technology describes tools that process user data on the user's device or inside a controlled local runtime. For elderly and low-vision users, local tools can help summarize long articles, read documents, convert forms into tables, and describe images without sending private files to third-party inference APIs.
+
+The main design tradeoff is that small local models may be slower or less capable than large hosted systems. A routed small-model stack can reduce this problem by assigning text, vision, speech, and export work to specialized local components.
+
+For accessibility, useful systems should use simple language, large controls, visible warnings, and clear uncertainty. Financial, medical, and legal outputs should be treated as drafts that require human review.

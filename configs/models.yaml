@@ -1,0 +1,40 @@
+runtime:
+  local_only: true
+  allow_remote_inference: false
+  allow_remote_file_uploads: false
+  allow_external_apis: false
+  telemetry_enabled: false
+  preferred_serving: llama.cpp
+  preferred_format: GGUF
+model_policy:
+  allowed_sources:
+    - OpenBMB
+    - NVIDIA
+    - Cohere
+    - BFL
+  max_v1_total_parameters_b: 32
+models:
+  text:
+    id: nvidia/NVIDIA-Nemotron-3-Nano-4B-GGUF
+    source: NVIDIA
+    format: GGUF
+    serving: llama.cpp
+    endpoint: http://127.0.0.1:8081
+    parameters_b: 4
+    enabled: true
+  vision:
+    id: openbmb/MiniCPM-V-4.6-gguf
+    source: OpenBMB
+    format: GGUF
+    serving: llama.cpp
+    endpoint: http://127.0.0.1:8082
+    parameters_b: 8
+    enabled: true
+  asr:
+    id: nvidia/parakeet-tdt-0.6b-v3
+    source: NVIDIA
+    format: local
+    serving: parakeet_service
+    endpoint: http://127.0.0.1:8090
+    parameters_b: 0.6
+    enabled: true

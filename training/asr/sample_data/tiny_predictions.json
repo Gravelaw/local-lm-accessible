@@ -1,0 +1,20 @@
+[
+  {
+    "audio_filepath": "training/asr/sample_data/en_elderly_clean.wav",
+    "prediction": "please read the invoice total aloud",
+    "language": "en",
+    "unsupported_language": false
+  },
+  {
+    "audio_filepath": "training/asr/sample_data/de_adult_noisy.wav",
+    "prediction": "bitte lesen sie die rechnung",
+    "language": "de",
+    "unsupported_language": false
+  },
+  {
+    "audio_filepath": "training/asr/sample_data/hi_elderly_eval.wav",
+    "prediction": "kripya kul rashi padhiye",
+    "language": "hi",
+    "unsupported_language": true
+  }
+]
