@@ -135,6 +135,11 @@ Model weights, datasets, and third-party artifacts are not relicensed by this
 repository. They remain under their upstream licenses and must continue to pass
 the project license, vendor, PII, and local-only gates before use.
 
+## Attribution
+
+This repository is maintained by Gravelaw and was implemented with assistance
+from OpenAI Codex.
+
 ## Dataset Policy
 
 Training data must focus on India, Southeast Asia, North America, and Europe. Every dataset entry must include license, region, country, language, modality, task, and PII metadata. Unknown, missing, ambiguous, or unverifiable licenses are rejected.
