@@ -231,6 +231,68 @@ The cap is checked against registry `size_bytes` metadata before download and ag
 
 CORD is currently file-indexed from parquet artifacts. Add a parquet reader such as `pyarrow` before converting CORD records into normalized document-extraction JSONL.
 
+### Modal Data Prep And Fine-Tuning
+
+The Build Small Hackathon provides Modal credits for data processing and model
+fine-tuning. The Modal workflow is intentionally separate from the Gradio
+runtime: `modal` is an optional dependency, and the shipped app does not import
+Modal, cloud SDKs, or dataset loaders.
+
+Install the optional Modal tooling locally:
+
+```bash
+.venv/bin/python -m pip install -e ".[modal]"
+```
+
+Create the Modal volumes and Hugging Face token secret once:
+
+```bash
+.venv/bin/modal volume create local-lm-data
+.venv/bin/modal volume create local-lm-cache
+.venv/bin/modal secret create huggingface-secret HF_TOKEN=hf_...
+```
+
+Run remote ingestion and preparation with the same 10 GB dataset cap:
+
+```bash
+.venv/bin/modal run modal_workflows/local_lm_pipeline.py::app.ingest_data \
+  --max-dataset-size-gb 10
+```
+
+Run registry batch processing and prepared training-manifest generation:
+
+```bash
+.venv/bin/modal run modal_workflows/local_lm_pipeline.py::app.batch_process_registry
+```
+
+Run the full remote data pipeline:
+
+```bash
+.venv/bin/modal run modal_workflows/local_lm_pipeline.py::app.prepare_all_data \
+  --max-dataset-size-gb 10
+```
+
+Run fine-tuning dry runs on Modal GPU compute:
+
+```bash
+.venv/bin/modal run modal_workflows/local_lm_pipeline.py::app.finetune_text --dry-run
+.venv/bin/modal run modal_workflows/local_lm_pipeline.py::app.finetune_vision --dry-run
+```
+
+The Modal app copies source code into `/workspace/local-lm`, stores data and
+reports on the `local-lm-data` volume under `/vol/local-lm`, and uses
+`local-lm-cache` for package and Hugging Face caches. `.modalignore` excludes
+local virtual environments, raw data, prepared data, model weights, and training
+outputs from the uploaded source bundle.
+
+Before fine-tuning, confirm these Modal outputs exist:
+
+- `/vol/local-lm/data/processed/training/document_extraction_*.jsonl`
+- `/vol/local-lm/data/processed/training/text_sft_*.jsonl`
+- `/vol/local-lm/data/processed/training/asr_*.jsonl`
+- `/vol/local-lm/data/processed/training/tabular_eval.jsonl`
+- `/vol/local-lm/reports/prepared_dataset_gaps.*`
+
 ## Development
 
 Install development dependencies in a local environment, then run:

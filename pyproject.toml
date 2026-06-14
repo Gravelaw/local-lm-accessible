@@ -36,6 +36,9 @@ training = [
   "trl>=0.11",
   "bitsandbytes>=0.43",
 ]
+modal = [
+  "modal>=1.0",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -43,7 +46,7 @@ pythonpath = ["."]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["data*", "evals*", "scripts*", "services*", "training*"]
+include = ["data*", "evals*", "modal_workflows*", "scripts*", "services*", "training*"]
 namespaces = true
 
 [tool.ruff]

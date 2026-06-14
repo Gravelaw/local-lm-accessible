@@ -9,14 +9,17 @@ from pydantic import BaseModel, Field, ValidationError, field_validator, model_v
 
 ALLOWED_REGIONS = {"India", "Southeast Asia", "North America", "Europe"}
 ALLOWED_TASKS = {
+    "document_ocr",
     "invoice_extraction",
     "receipt_extraction",
     "bill_extraction",
     "bank_statement_extraction",
     "handwritten_note_transcription",
     "image_accessibility_description",
+    "image_text_translation",
     "image_translation",
     "ocr_text_extraction",
+    "visual_question_answering",
 }
 UNKNOWN_LICENSE_VALUES = {"", "unknown", "unk", "n/a", "na", "none", "tbd", "unlicensed"}
 PROTECTED_DOCUMENT_TASKS = {

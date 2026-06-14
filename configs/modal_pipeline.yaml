@@ -1,0 +1,41 @@
+modal:
+  app_name: local-lm-data-finetune
+  volume_name: local-lm-data
+  cache_volume_name: local-lm-cache
+  hf_secret_name: huggingface-secret
+  default_max_dataset_size_gb: 10
+
+paths:
+  remote_repo: /workspace/local-lm
+  volume_root: /vol/local-lm
+  raw_root: /vol/local-lm/data/raw/datasets
+  processed_root: /vol/local-lm/data/processed/datasets
+  reports_dir: /vol/local-lm/reports
+  checkpoint: /vol/local-lm/data/registry/small_dataset_ingestion_status.json
+
+data_ingestion:
+  targets:
+    - huggingface:ryanznie/SROIE_2019_with_labels
+    - manual:FATURA
+    - manual:XFUND
+    - manual:CORD
+    - synthetic:local-lm-regional-documents
+    - huggingface:google/fleurs
+    - uci:online-retail
+  synthetic_count_per_kind: 8
+  tabular_limit: 500
+
+batch_processing:
+  steps:
+    - audit_registry
+    - map_datasets_to_tasks
+    - build_training_mix
+    - build_prepared_training_manifests
+    - check_regional_balance
+    - verify_dataset_locality
+
+finetuning:
+  text_config: training/text/configs/nemotron_router_summary_lora.yaml
+  vision_config: training/vision/configs/minicpm_v_document_lora.yaml
+  default_gpu: A10G
+  dry_run_default: true

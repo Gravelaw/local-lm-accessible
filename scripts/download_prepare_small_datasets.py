@@ -417,6 +417,113 @@ def prepare_fatura_invoice_extraction(raw_dir: Path, processed_dir: Path) -> dic
     return {"rows": len(rows), "outputs": [display_path(output)]}
 
 
+def prepare_cord_receipt_extraction(raw_dir: Path, processed_dir: Path) -> dict[str, Any]:
+    parquet_paths = sorted(raw_dir.rglob("*.parquet"))
+    if not parquet_paths:
+        return {"rows": 0, "outputs": [], "notes": "CORD parquet files were not found."}
+    try:
+        import pyarrow.parquet as pq
+    except ImportError as exc:
+        raise RuntimeError("pyarrow is required to normalize CORD parquet records") from exc
+
+    processed_dir.mkdir(parents=True, exist_ok=True)
+    image_dir = processed_dir / "images"
+    image_dir.mkdir(parents=True, exist_ok=True)
+    rows: list[dict[str, Any]] = []
+    for parquet_path in parquet_paths:
+        table = pq.read_table(parquet_path)
+        for index, item in enumerate(table.to_pylist()):
+            if not isinstance(item, dict):
+                continue
+            image_path = _extract_cord_image(item, image_dir, parquet_path.stem, index)
+            expected_output = _extract_cord_expected_output(item)
+            if image_path is None or expected_output is None:
+                continue
+            split = _infer_split_from_path(parquet_path)
+            rows.append(
+                {
+                    "image_path": display_path(image_path),
+                    "prompt": "Extract receipt fields, line items, totals, and visible OCR text.",
+                    "expected_output": expected_output,
+                    "region": "Southeast Asia",
+                    "country": "Indonesia",
+                    "language": "en",
+                    "task": "receipt_extraction",
+                    "source_type": "manual",
+                    "source_dataset": "CORD",
+                    "license": "Apache-2.0",
+                    "pii_status": "redacted",
+                    "modality": "image",
+                    "document_type": "receipt",
+                    "split_usage": split,
+                    "human_review_required": False,
+                }
+            )
+    output = processed_dir / "receipt_extraction.jsonl"
+    write_jsonl(output, rows)
+    return {"rows": len(rows), "outputs": [display_path(output)]}
+
+
+def _extract_cord_image(
+    item: dict[str, Any],
+    image_dir: Path,
+    stem: str,
+    index: int,
+) -> Path | None:
+    image = item.get("image") or item.get("images")
+    if isinstance(image, dict):
+        for key in ("bytes", "data"):
+            value = image.get(key)
+            if isinstance(value, bytes):
+                image_path = image_dir / f"{stem}-{index:06d}.jpg"
+                image_path.write_bytes(value)
+                return image_path
+        path_value = image.get("path")
+        if isinstance(path_value, str) and path_value.strip():
+            candidate = Path(path_value)
+            return candidate if candidate.exists() else None
+    if isinstance(image, bytes):
+        image_path = image_dir / f"{stem}-{index:06d}.jpg"
+        image_path.write_bytes(image)
+        return image_path
+    for key in ("image_path", "file_name", "filename", "path"):
+        value = item.get(key)
+        if isinstance(value, str) and value.strip():
+            candidate = Path(value)
+            if candidate.exists():
+                return candidate
+    return None
+
+
+def _extract_cord_expected_output(item: dict[str, Any]) -> dict[str, Any] | None:
+    for key in ("ground_truth", "gt", "label", "labels", "annotation", "annotations"):
+        value = item.get(key)
+        if isinstance(value, dict):
+            return value
+        if isinstance(value, str) and value.strip():
+            try:
+                parsed = json.loads(value)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(parsed, dict):
+                return parsed
+    extracted = {
+        key: item[key]
+        for key in ("ocr", "text", "words", "lines", "valid_line", "meta")
+        if key in item
+    }
+    return extracted or None
+
+
+def _infer_split_from_path(path: Path) -> str:
+    lowered = path.as_posix().casefold()
+    if "validation" in lowered or "val" in lowered:
+        return "validation"
+    if "test" in lowered:
+        return "test"
+    return "train"
+
+
 def _matching_image(image_dir: Path, stem: str) -> Path | None:
     for suffix in (".jpg", ".jpeg", ".png"):
         path = image_dir / f"{stem}{suffix}"
@@ -715,7 +822,10 @@ def ingest_dataset(
             if no_network:
                 raise RuntimeError("network disabled for CORD download")
             download_huggingface_snapshot(dataset, raw_dir, raw_root / ".hf_cache")
-            result = prepare_file_index(raw_dir, processed_dir, dataset)
+            result = _merge_prepare_results(
+                prepare_file_index(raw_dir, processed_dir, dataset),
+                prepare_cord_receipt_extraction(raw_dir, processed_dir),
+            )
         elif dataset_id == "manual:FATURA":
             if no_network:
                 raise RuntimeError("network disabled for FATURA download")

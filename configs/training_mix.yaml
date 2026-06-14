@@ -1,7 +1,7 @@
 general:
-  india: 0.35
+  india: 0.20
   southeast_asia: 0.20
-  north_america: 0.25
+  north_america: 0.20
   europe: 0.20
 
 document_extraction:

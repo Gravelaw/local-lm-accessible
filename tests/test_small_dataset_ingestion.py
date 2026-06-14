@@ -2,12 +2,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from data.schemas.source_registry import read_jsonl, write_jsonl
 from scripts.download_prepare_small_datasets import (
     approved_small_targets,
     assert_dataset_size_cap,
     ingest_dataset,
     load_checkpoint,
+    prepare_cord_receipt_extraction,
     prepare_fatura_invoice_extraction,
     prepare_sroie_receipt_extraction,
     prepare_xfund_form_understanding,
@@ -203,6 +206,31 @@ def test_fatura_preparation_pairs_csv_images_and_annotations(tmp_path: Path) -> 
     assert result["rows"] == 1
     assert rows[0]["source_dataset"] == "FATURA"
     assert rows[0]["expected_output"]["TOTAL"]["text"] == "TOTAL : 1.00"
+
+
+def test_cord_preparation_normalizes_parquet_when_pyarrow_available(tmp_path: Path) -> None:
+    pq = pytest.importorskip("pyarrow.parquet")
+    pa = pytest.importorskip("pyarrow")
+    raw = tmp_path / "raw"
+    processed = tmp_path / "processed"
+    raw.mkdir()
+    table = pa.Table.from_pylist(
+        [
+            {
+                "image": {"bytes": b"fake image bytes"},
+                "ground_truth": '{"total": "12.30", "merchant": "Shop"}',
+            }
+        ]
+    )
+    pq.write_table(table, raw / "train.parquet")
+
+    result = prepare_cord_receipt_extraction(raw, processed)
+    rows = read_jsonl(processed / "receipt_extraction.jsonl")
+
+    assert result["rows"] == 1
+    assert rows[0]["source_dataset"] == "CORD"
+    assert rows[0]["task"] == "receipt_extraction"
+    assert rows[0]["expected_output"]["total"] == "12.30"
 
 
 def test_declared_dataset_size_cap_is_enforced(tmp_path: Path) -> None:

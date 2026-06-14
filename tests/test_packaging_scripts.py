@@ -57,7 +57,14 @@ def test_pyproject_uses_explicit_package_discovery() -> None:
 
     assert discovery["where"] == ["."]
     assert discovery["namespaces"] is True
-    assert set(discovery["include"]) == {"data*", "evals*", "scripts*", "services*", "training*"}
+    assert set(discovery["include"]) == {
+        "data*",
+        "evals*",
+        "modal_workflows*",
+        "scripts*",
+        "services*",
+        "training*",
+    }
 
 
 def test_download_plan_can_filter_one_model() -> None:
