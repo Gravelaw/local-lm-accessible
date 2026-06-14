@@ -23,6 +23,14 @@ APPROVED_PATH = REGISTRY_ROOT / "approved_datasets.jsonl"
 RESEARCH_EVAL_PATH = REGISTRY_ROOT / "research_eval_datasets.jsonl"
 REJECTED_PATH = REGISTRY_ROOT / "rejected_datasets.jsonl"
 TASK_MAPPED_PATH = REGISTRY_ROOT / "task_mapped_datasets.jsonl"
+TEXT_MODAL_CONFIG = (
+    REMOTE_ROOT / "training" / "text" / "configs" / "nemotron_modal_prepared_lora.yaml"
+)
+VISION_MODAL_CONFIG = (
+    REMOTE_ROOT / "training" / "vision" / "configs" / "minicpm_v_modal_document_lora.yaml"
+)
+TEXT_PREFLIGHT_REPORT = REPORTS_DIR / "fine_tuning_text_preflight.json"
+VISION_PREFLIGHT_REPORT = REPORTS_DIR / "fine_tuning_vision_preflight.json"
 
 DATA_VOLUME = modal.Volume.from_name("local-lm-data", create_if_missing=True)
 CACHE_VOLUME = modal.Volume.from_name("local-lm-cache", create_if_missing=True)
@@ -50,40 +58,71 @@ base_data_image = (
     )
 )
 
-data_image = (
-    base_data_image
-    .add_local_file("app.py", remote_path=str(REMOTE_ROOT / "app.py"))
-    .add_local_dir("configs", remote_path=str(REMOTE_ROOT / "configs"))
-    .add_local_file("data/__init__.py", remote_path=str(REMOTE_ROOT / "data" / "__init__.py"))
-    .add_local_dir("data/registry", remote_path=str(REMOTE_ROOT / "data" / "registry"))
-    .add_local_dir("data/schemas", remote_path=str(REMOTE_ROOT / "data" / "schemas"))
-    .add_local_dir("scripts", remote_path=str(REMOTE_ROOT / "scripts"))
-    .add_local_dir("services", remote_path=str(REMOTE_ROOT / "services"))
-    .add_local_dir("training", remote_path=str(REMOTE_ROOT / "training"))
+base_training_image = (
+    modal.Image.from_registry(
+        "nvidia/cuda:13.0.2-devel-ubuntu24.04",
+        add_python="3.11",
+    )
+    .apt_install("build-essential", "curl", "git", "libglib2.0-0", "libgl1", "ninja-build")
+    .pip_install(
+        "babel>=2.14",
+        "faker>=25.0",
+        "huggingface_hub>=0.26",
+        "jinja2>=3.1",
+        "openpyxl>=3.1",
+        "opencv-python-headless>=4.9",
+        "pandas>=2.2",
+        "pillow>=10.0",
+        "pydantic>=2.8",
+        "pyarrow>=16.0",
+        "pyyaml>=6.0",
+        "reportlab>=4.0",
+        "requests>=2.32",
+    )
 )
 
-training_image = (
-    base_data_image.pip_install(
+
+def _with_repo_files(image: modal.Image) -> modal.Image:
+    return (
+        image
+        .add_local_file("app.py", remote_path=str(REMOTE_ROOT / "app.py"))
+        .add_local_dir("configs", remote_path=str(REMOTE_ROOT / "configs"))
+        .add_local_file(
+            "data/__init__.py",
+            remote_path=str(REMOTE_ROOT / "data" / "__init__.py"),
+        )
+        .add_local_dir("data/registry", remote_path=str(REMOTE_ROOT / "data" / "registry"))
+        .add_local_dir("data/schemas", remote_path=str(REMOTE_ROOT / "data" / "schemas"))
+        .add_local_dir("scripts", remote_path=str(REMOTE_ROOT / "scripts"))
+        .add_local_dir("services", remote_path=str(REMOTE_ROOT / "services"))
+        .add_local_dir("training", remote_path=str(REMOTE_ROOT / "training"))
+    )
+
+
+data_image = _with_repo_files(base_data_image)
+
+training_dependencies_image = (
+    base_training_image
+    .pip_install("torch==2.12.0", "packaging>=24.0", "setuptools>=69,<82", "wheel>=0.43")
+    .pip_install(
         "accelerate>=0.34",
         "bitsandbytes>=0.43",
         "datasets>=2.20",
         "peft>=0.12",
-        "torch>=2.4",
-        "transformers>=4.46",
+        "transformers>=4.46,<5",
         "trl>=0.11",
     )
-    .add_local_file("app.py", remote_path=str(REMOTE_ROOT / "app.py"))
-    .add_local_dir("configs", remote_path=str(REMOTE_ROOT / "configs"))
-    .add_local_file("data/__init__.py", remote_path=str(REMOTE_ROOT / "data" / "__init__.py"))
-    .add_local_dir("data/registry", remote_path=str(REMOTE_ROOT / "data" / "registry"))
-    .add_local_dir("data/schemas", remote_path=str(REMOTE_ROOT / "data" / "schemas"))
-    .add_local_dir("scripts", remote_path=str(REMOTE_ROOT / "scripts"))
-    .add_local_dir("services", remote_path=str(REMOTE_ROOT / "services"))
-    .add_local_dir("training", remote_path=str(REMOTE_ROOT / "training"))
 )
 
+training_image = _with_repo_files(training_dependencies_image)
 
-def _run(command: list[str], *, cwd: Path = REMOTE_ROOT) -> dict[str, Any]:
+
+def _run(
+    command: list[str],
+    *,
+    cwd: Path = REMOTE_ROOT,
+    extra_env: dict[str, str] | None = None,
+) -> dict[str, Any]:
     env = os.environ.copy()
     env.setdefault("HF_HOME", "/cache/huggingface")
     env.setdefault("HF_HUB_CACHE", "/cache/huggingface/hub")
@@ -95,6 +134,35 @@ def _run(command: list[str], *, cwd: Path = REMOTE_ROOT) -> dict[str, Any]:
         if not existing_pythonpath
         else f"{REMOTE_ROOT}:{existing_pythonpath}"
     )
+    site_lib = Path("/usr/local/lib/python3.11/site-packages")
+    cuda_library_paths = [
+        site_lib / "nvidia" / name / "lib"
+        for name in (
+            "cublas",
+            "cuda_cupti",
+            "cuda_nvrtc",
+            "cuda_runtime",
+            "cudnn",
+            "cufft",
+            "cufile",
+            "curand",
+            "cusolver",
+            "cusparse",
+            "nvjitlink",
+            "nvshmem",
+            "nvtx",
+        )
+    ]
+    existing_ld_library_path = env.get("LD_LIBRARY_PATH", "")
+    env["LD_LIBRARY_PATH"] = ":".join(
+        [
+            *(str(path) for path in cuda_library_paths),
+            "/usr/local/cuda/lib64",
+            *(existing_ld_library_path.split(":") if existing_ld_library_path else []),
+        ]
+    )
+    if extra_env:
+        env.update(extra_env)
     completed = subprocess.run(
         command,
         cwd=cwd,
@@ -232,6 +300,28 @@ def _commit_volumes() -> None:
     CACHE_VOLUME.commit()
 
 
+def _preflight_command(
+    *,
+    modality: str,
+    config_path: Path,
+    report_path: Path,
+    require_images: bool = False,
+) -> list[str]:
+    command = [
+        "python",
+        "scripts/preflight_finetuning_manifests.py",
+        "--modality",
+        modality,
+        "--config",
+        str(config_path),
+        "--report",
+        str(report_path),
+    ]
+    if require_images:
+        command.append("--require-images")
+    return command
+
+
 @app.function(
     image=data_image,
     volumes={str(VOLUME_ROOT): DATA_VOLUME, "/cache": CACHE_VOLUME},
@@ -308,17 +398,71 @@ def prepare_all_data(
     retries=1,
 )
 def finetune_text(dry_run: bool = True, limit: int = 16) -> dict[str, Any]:
+    if not dry_run:
+        raise ValueError("full Nemotron training requires finetune_text_nemotron")
+    preflight = _run(
+        _preflight_command(
+            modality="text",
+            config_path=TEXT_MODAL_CONFIG,
+            report_path=TEXT_PREFLIGHT_REPORT,
+        )
+    )
     command = [
         "python",
         "training/text/train_nemotron_lora.py",
         "--config",
-        "training/text/configs/nemotron_router_summary_lora.yaml",
+        str(TEXT_MODAL_CONFIG),
     ]
     if dry_run:
         command.extend(["--dry-run", "--limit", str(limit)])
     result = _run(command)
     _commit_volumes()
-    return result
+    return {"preflight": preflight, "training": result}
+
+
+@app.function(
+    image=training_image,
+    volumes={str(VOLUME_ROOT): DATA_VOLUME, "/cache": CACHE_VOLUME},
+    secrets=[HF_SECRET],
+    gpu="A10G",
+    timeout=60 * 60 * 8,
+    retries=1,
+)
+def finetune_text_nemotron(dry_run: bool = False, limit: int = 16) -> dict[str, Any]:
+    preflight = _run(
+        _preflight_command(
+            modality="text",
+            config_path=TEXT_MODAL_CONFIG,
+            report_path=TEXT_PREFLIGHT_REPORT,
+        )
+    )
+    mamba_install = _run(
+        [
+            "python",
+            "-m",
+            "pip",
+            "install",
+            "causal-conv1d>=1.4",
+            "mamba-ssm>=2.2",
+            "--no-build-isolation",
+        ],
+        extra_env={
+            "CC": "/usr/bin/gcc",
+            "CXX": "/usr/bin/g++",
+            "CUDAHOSTCXX": "/usr/bin/g++",
+        },
+    )
+    command = [
+        "python",
+        "training/text/train_nemotron_lora.py",
+        "--config",
+        str(TEXT_MODAL_CONFIG),
+    ]
+    if dry_run:
+        command.extend(["--dry-run", "--limit", str(limit)])
+    result = _run(command)
+    _commit_volumes()
+    return {"preflight": preflight, "mamba_install": mamba_install, "training": result}
 
 
 @app.function(
@@ -330,17 +474,25 @@ def finetune_text(dry_run: bool = True, limit: int = 16) -> dict[str, Any]:
     retries=1,
 )
 def finetune_vision(dry_run: bool = True, limit: int = 6) -> dict[str, Any]:
+    preflight = _run(
+        _preflight_command(
+            modality="vision",
+            config_path=VISION_MODAL_CONFIG,
+            report_path=VISION_PREFLIGHT_REPORT,
+            require_images=not dry_run,
+        )
+    )
     command = [
         "python",
         "training/vision/train_minicpm_v_lora.py",
         "--config",
-        "training/vision/configs/minicpm_v_document_lora.yaml",
+        str(VISION_MODAL_CONFIG),
     ]
     if dry_run:
         command.extend(["--dry-run", "--limit", str(limit)])
     result = _run(command)
     _commit_volumes()
-    return result
+    return {"preflight": preflight, "training": result}
 
 
 @app.local_entrypoint()
@@ -360,7 +512,12 @@ def main(
             max_dataset_size_gb=max_dataset_size_gb,
         )
     elif action == "finetune_text":
-        result = finetune_text.remote(dry_run=dry_run)
+        if dry_run:
+            result = finetune_text.remote(dry_run=True)
+        else:
+            result = finetune_text_nemotron.remote(dry_run=False)
+    elif action == "finetune_text_nemotron":
+        result = finetune_text_nemotron.remote(dry_run=dry_run)
     elif action == "finetune_vision":
         result = finetune_vision.remote(dry_run=dry_run)
     else:

@@ -35,7 +35,32 @@ batch_processing:
     - verify_dataset_locality
 
 finetuning:
-  text_config: training/text/configs/nemotron_router_summary_lora.yaml
-  vision_config: training/vision/configs/minicpm_v_document_lora.yaml
+  text_config: training/text/configs/nemotron_modal_prepared_lora.yaml
+  vision_config: training/vision/configs/minicpm_v_modal_document_lora.yaml
   default_gpu: A10G
+  gpu_upgrade_order:
+    - A10G
+    - A100-40GB
+    - A100-80GB
+    - H100
+    - H200
   dry_run_default: true
+  default_text_backend: hf_trl_peft
+  optional_text_backends:
+    unsloth:
+      status: candidate
+      use_when: faster Nemotron 3 LoRA/QLoRA is needed and dependency smoke tests pass
+      notes: Keep HF TRL/PEFT as default until Unsloth path is validated with local-lm manifests.
+    hf_trl_peft:
+      status: default
+      use_when: controlled baseline training and compatibility with existing trainer tests
+  retrieval_augmentation:
+    vector_index_status: backlog
+    use_when: selecting/evaluating examples for RAG or dataset curation, not as a replacement for SFT
+    candidates:
+      - sqlite_fts5
+      - faiss
+      - turbovec_or_equivalent_if_license_and_local_runtime_are_validated
+  preflight_reports:
+    text: /vol/local-lm/reports/fine_tuning_text_preflight.json
+    vision: /vol/local-lm/reports/fine_tuning_vision_preflight.json

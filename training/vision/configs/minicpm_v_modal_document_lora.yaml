@@ -1,0 +1,46 @@
+model:
+  base_model: openbmb/MiniCPM-V-4.6
+  allowed_vendor: OpenBMB
+  deployment_target: local llama.cpp or local Transformers vision server
+
+data:
+  train_file: /vol/local-lm/data/processed/training/document_extraction_train.jsonl
+  eval_file: /vol/local-lm/data/processed/training/document_extraction_validation.jsonl
+  max_seq_length: 4096
+  image_max_pixels: 1048576
+  require_license_metadata: true
+  reject_unknown_license: true
+  protected_document_policy: synthetic_redacted_or_opt_in
+
+lora:
+  enabled: true
+  r: 16
+  alpha: 32
+  dropout: 0.05
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+
+qlora:
+  enabled: true
+  load_in_4bit: true
+  bnb_4bit_quant_type: nf4
+  bnb_4bit_use_double_quant: true
+
+training:
+  backend: llama_factory
+  fallback_backend: swift
+  output_dir: /vol/local-lm/training/vision/minicpm_v_modal_document_lora
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 8
+  learning_rate: 0.0001
+  num_train_epochs: 1
+  eval_steps: 25
+  save_steps: 25
+  save_best_adapter: true
+  gradient_checkpointing: true
+  bf16_auto: true
+  local_logs_only: true
+  wandb: disabled

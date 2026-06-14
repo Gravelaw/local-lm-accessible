@@ -229,7 +229,8 @@ Each dataset is capped at 10 GB by default:
 
 The cap is checked against registry `size_bytes` metadata before download and against local raw/processed files after preparation. Datasets above the cap must be split into smaller approved subsets before ingestion.
 
-CORD is currently file-indexed from parquet artifacts. Add a parquet reader such as `pyarrow` before converting CORD records into normalized document-extraction JSONL.
+CORD parquet artifacts are normalized into receipt-extraction JSONL when
+`pyarrow` is available. The file index is still written for traceability.
 
 ### Modal Data Prep And Fine-Tuning
 
@@ -255,28 +256,46 @@ Create the Modal volumes and Hugging Face token secret once:
 Run remote ingestion and preparation with the same 10 GB dataset cap:
 
 ```bash
-.venv/bin/modal run modal_workflows/local_lm_pipeline.py::app.ingest_data \
+.venv/bin/modal run modal_workflows/local_lm_pipeline.py \
+  --action ingest_data \
   --max-dataset-size-gb 10
 ```
 
 Run registry batch processing and prepared training-manifest generation:
 
 ```bash
-.venv/bin/modal run modal_workflows/local_lm_pipeline.py::app.batch_process_registry
+.venv/bin/modal run modal_workflows/local_lm_pipeline.py --action batch_process
 ```
 
 Run the full remote data pipeline:
 
 ```bash
-.venv/bin/modal run modal_workflows/local_lm_pipeline.py::app.prepare_all_data \
+.venv/bin/modal run modal_workflows/local_lm_pipeline.py \
+  --action prepare_all_data \
   --max-dataset-size-gb 10
 ```
 
 Run fine-tuning dry runs on Modal GPU compute:
 
 ```bash
-.venv/bin/modal run modal_workflows/local_lm_pipeline.py::app.finetune_text --dry-run
-.venv/bin/modal run modal_workflows/local_lm_pipeline.py::app.finetune_vision --dry-run
+.venv/bin/modal run modal_workflows/local_lm_pipeline.py --action finetune_text --dry-run
+.venv/bin/modal run modal_workflows/local_lm_pipeline.py --action finetune_vision --dry-run
+```
+
+The default text fine-tuning backend is Hugging Face TRL `SFTTrainer` with PEFT
+LoRA/QLoRA because it is already covered by local tests. Unsloth is tracked as a
+candidate acceleration backend for Nemotron 3 after dependency smoke tests pass.
+Dry-run and preflight use the lightweight HF/TRL image. Real Nemotron training
+has an explicit Mamba install step because that model family requires native
+CUDA extension dependencies.
+If the capped job is memory- or throughput-bound, increase Modal GPU class in
+this order: `A10G`, `A100-40GB`, `A100-80GB`, `H100`, then `H200`.
+
+Run the first guarded text adapter job only after dry runs and preflight reports
+pass:
+
+```bash
+.venv/bin/modal run modal_workflows/local_lm_pipeline.py --action finetune_text --no-dry-run
 ```
 
 The Modal app copies source code into `/workspace/local-lm`, stores data and
@@ -292,6 +311,7 @@ Before fine-tuning, confirm these Modal outputs exist:
 - `/vol/local-lm/data/processed/training/asr_*.jsonl`
 - `/vol/local-lm/data/processed/training/tabular_eval.jsonl`
 - `/vol/local-lm/reports/prepared_dataset_gaps.*`
+- `/vol/local-lm/reports/fine_tuning_*_preflight.json`
 
 ## Development
 
@@ -303,12 +323,25 @@ ruff check .
 ```
 
 Training and eval workspaces include local dry-run paths for text, vision, and
-ASR. Full adapter training remains hardware- and artifact-dependent. Runtime
+ASR. Modal text fine-tuning uses prepared manifests on `local-lm-data`; full
+vision adapter training remains backend- and artifact-dependent. Runtime
 installs keep training-heavy packages optional; install the training extra only
 when running LoRA/QLoRA or eval work:
 
+Vector or embedding databases are useful for local retrieval, example selection,
+deduplication, and eval-set construction. They should not be treated as a
+replacement for supervised fine-tuning. Any TurboVec-style backend must pass
+license review and local-runtime checks before being added to the app path.
+
 ```bash
 pip install -e ".[dev,training]"
+```
+
+Install the Nemotron native-extension extra only on CUDA-capable training
+machines:
+
+```bash
+pip install -e ".[nemotron-training]"
 ```
 
 Model packaging checks:

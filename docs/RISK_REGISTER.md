@@ -20,6 +20,7 @@ This register is now being maintained as implementation progresses.
 - ASR service now rejects missing local audio files and reports whether the Parakeet artifact is checksum-ready.
 - ASR service now has a lazy local-only Parakeet transcription path for checksum-verified artifacts and falls back visibly if the local runtime dependency is unavailable.
 - ASR NeMo training launcher now defaults to dry-run, validates train/validation manifests before training, rejects remote audio upload, and requires audio files for real training.
+- Modal text fine-tuning defaults to HF TRL/PEFT. Unsloth is tracked as an acceleration candidate for Nemotron 3, but must pass dependency, license, and manifest compatibility checks before becoming default.
 - ASR eval now writes tested JSON/Markdown reports and lists unsupported-language detection failures explicitly, so unsupported-language hallucinations are auditable instead of only aggregated.
 - Image/PDF document conversion now attempts local vision-model JSON extraction, validates outputs with Pydantic invoice/bank schemas, and falls back with warnings on malformed JSON.
 - Gradio XLSX document exports now include a metadata sheet with task, status, confidence, warnings, source, model endpoint, and human-review flag.

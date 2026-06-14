@@ -9,6 +9,10 @@ keep logs local, and avoid cloud OCR, cloud inference, and remote telemetry. The
 preferred execution backend is LLaMA-Factory, with SWIFT as a fallback for local
 experiments.
 
+The local sample config stays available for small validation. Modal uses
+`training/vision/configs/minicpm_v_modal_document_lora.yaml` to validate prepared
+document-extraction manifests on `/vol/local-lm/data/processed/training`.
+
 ## Data Format
 
 Training records are JSONL objects validated by `training/vision/prepare_dataset.py`.

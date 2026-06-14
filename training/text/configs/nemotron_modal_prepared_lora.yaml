@@ -1,0 +1,71 @@
+model:
+  base_model: nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16
+  trust_remote_code: true
+  deployment_target:
+    - GGUF Q4_K_M
+    - GGUF Q5_K_M
+
+data:
+  train_file: /vol/local-lm/data/processed/training/text_sft_train.jsonl
+  eval_file: /vol/local-lm/data/processed/training/text_sft_validation.jsonl
+  max_seq_length: 2048
+  required_metadata:
+    - region
+    - country
+    - language
+    - task
+    - source_type
+    - license
+    - pii_status
+
+training:
+  backend: hf_trl_peft
+  optional_backend_candidates:
+    - unsloth
+  output_dir: /vol/local-lm/training/text/nemotron_modal_prepared_lora
+  per_device_train_batch_size: 1
+  per_device_eval_batch_size: 1
+  gradient_accumulation_steps: 8
+  learning_rate: 0.0002
+  num_train_epochs: 1
+  max_steps: 20
+  eval_steps: 5
+  save_steps: 5
+  logging_steps: 1
+  save_total_limit: 2
+  save_best_adapter: true
+  metric_for_best_model: eval_loss
+  greater_is_better: false
+  gradient_checkpointing: true
+  bf16: auto
+  fp16: false
+  seed: 20260607
+  report_to: []
+  local_logs_only: true
+  disable_wandb: true
+
+qlora:
+  enabled: true
+  load_in_4bit: true
+  bnb_4bit_quant_type: nf4
+  bnb_4bit_compute_dtype: bfloat16
+  bnb_4bit_use_double_quant: true
+
+lora:
+  r: 16
+  alpha: 32
+  dropout: 0.05
+  bias: none
+  task_type: CAUSAL_LM
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+
+eval:
+  report_json: /vol/local-lm/reports/text_eval.json
+  report_markdown: /vol/local-lm/reports/text_eval.md
