@@ -288,6 +288,10 @@ candidate acceleration backend for Nemotron 3 after dependency smoke tests pass.
 Dry-run and preflight use the lightweight HF/TRL image. Real Nemotron training
 has an explicit Mamba install step because that model family requires native
 CUDA extension dependencies.
+The native-extension step runs a CUDA toolchain preflight first and pins the
+CUDA host compiler to `/usr/bin/g++` through `CUDAHOSTCXX`, `CMAKE_ARGS`,
+`CUDAFLAGS`, and `NVCC_PREPEND_FLAGS` so CUDA 13 does not accidentally select an
+unsupported `clang++`.
 If the capped job is memory- or throughput-bound, increase Modal GPU class in
 this order: `A10G`, `A100-40GB`, `A100-80GB`, `H100`, then `H200`.
 

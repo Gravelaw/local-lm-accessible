@@ -30,3 +30,6 @@ Run the Modal prepared-manifest dry run:
 Real Modal text training remains guarded by `--no-dry-run`, runs the explicit
 Mamba/Nemotron dependency install step, uses capped `max_steps`, disables remote
 logging, and writes adapter outputs under `/vol/local-lm/training/text`.
+Before installing Mamba, the Modal workflow runs `scripts/check_cuda_toolchain.py`
+with the CUDA host compiler pinned to `/usr/bin/g++`; this prevents CUDA 13 from
+falling through to an unsupported or partially installed `clang++`.

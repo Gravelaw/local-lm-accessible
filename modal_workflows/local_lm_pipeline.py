@@ -182,6 +182,29 @@ def _run(
     return result
 
 
+def _cuda_extension_build_env() -> dict[str, str]:
+    cuda_home = "/usr/local/cuda"
+    host_compiler = "/usr/bin/g++"
+    c_compiler = "/usr/bin/gcc"
+    return {
+        "CC": c_compiler,
+        "CXX": host_compiler,
+        "CUDAHOSTCXX": host_compiler,
+        "CUDACXX": f"{cuda_home}/bin/nvcc",
+        "CUDA_HOME": cuda_home,
+        "CMAKE_CUDA_COMPILER": f"{cuda_home}/bin/nvcc",
+        "CMAKE_CUDA_HOST_COMPILER": host_compiler,
+        "CMAKE_CXX_COMPILER": host_compiler,
+        "CMAKE_ARGS": (
+            f"-DCMAKE_CUDA_COMPILER={cuda_home}/bin/nvcc "
+            f"-DCMAKE_CUDA_HOST_COMPILER={host_compiler} "
+            f"-DCMAKE_CXX_COMPILER={host_compiler}"
+        ),
+        "CUDAFLAGS": f"-ccbin={host_compiler} --allow-unsupported-compiler",
+        "NVCC_PREPEND_FLAGS": f"-ccbin={host_compiler}",
+    }
+
+
 def _stage_registry_seed() -> None:
     source = REMOTE_ROOT / "data" / "registry"
     target = REGISTRY_ROOT
@@ -425,16 +448,36 @@ def finetune_text(dry_run: bool = True, limit: int = 16) -> dict[str, Any]:
     volumes={str(VOLUME_ROOT): DATA_VOLUME, "/cache": CACHE_VOLUME},
     secrets=[HF_SECRET],
     gpu="A10G",
+    timeout=60 * 10,
+    retries=1,
+)
+def check_training_toolchain() -> dict[str, Any]:
+    return _run(
+        ["python", "scripts/check_cuda_toolchain.py"],
+        extra_env=_cuda_extension_build_env(),
+    )
+
+
+@app.function(
+    image=training_image,
+    volumes={str(VOLUME_ROOT): DATA_VOLUME, "/cache": CACHE_VOLUME},
+    secrets=[HF_SECRET],
+    gpu="A10G",
     timeout=60 * 60 * 8,
     retries=1,
 )
 def finetune_text_nemotron(dry_run: bool = False, limit: int = 16) -> dict[str, Any]:
+    cuda_build_env = _cuda_extension_build_env()
     preflight = _run(
         _preflight_command(
             modality="text",
             config_path=TEXT_MODAL_CONFIG,
             report_path=TEXT_PREFLIGHT_REPORT,
         )
+    )
+    cuda_toolchain = _run(
+        ["python", "scripts/check_cuda_toolchain.py"],
+        extra_env=cuda_build_env,
     )
     mamba_install = _run(
         [
@@ -446,11 +489,7 @@ def finetune_text_nemotron(dry_run: bool = False, limit: int = 16) -> dict[str, 
             "mamba-ssm>=2.2",
             "--no-build-isolation",
         ],
-        extra_env={
-            "CC": "/usr/bin/gcc",
-            "CXX": "/usr/bin/g++",
-            "CUDAHOSTCXX": "/usr/bin/g++",
-        },
+        extra_env=cuda_build_env,
     )
     command = [
         "python",
@@ -462,7 +501,12 @@ def finetune_text_nemotron(dry_run: bool = False, limit: int = 16) -> dict[str, 
         command.extend(["--dry-run", "--limit", str(limit)])
     result = _run(command)
     _commit_volumes()
-    return {"preflight": preflight, "mamba_install": mamba_install, "training": result}
+    return {
+        "preflight": preflight,
+        "cuda_toolchain": cuda_toolchain,
+        "mamba_install": mamba_install,
+        "training": result,
+    }
 
 
 @app.function(
@@ -520,6 +564,8 @@ def main(
         result = finetune_text_nemotron.remote(dry_run=dry_run)
     elif action == "finetune_vision":
         result = finetune_vision.remote(dry_run=dry_run)
+    elif action == "check_training_toolchain":
+        result = check_training_toolchain.remote()
     else:
         raise ValueError(f"unsupported action: {action}")
     print(json.dumps(result, indent=2, sort_keys=True))

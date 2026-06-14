@@ -26,12 +26,17 @@ def test_modal_workflow_uses_image_volumes_and_secrets() -> None:
     assert "--max-dataset-size-gb" in source
     assert "training/text/train_nemotron_lora.py" in source
     assert "training/vision/train_minicpm_v_lora.py" in source
+    assert "check_training_toolchain" in source
     assert "scripts/preflight_finetuning_manifests.py" in source
     assert "nemotron_modal_prepared_lora.yaml" in source
     assert "minicpm_v_modal_document_lora.yaml" in source
     assert "mamba-ssm" in source
     assert "causal-conv1d" in source
-    assert '"CUDAHOSTCXX": "/usr/bin/g++"' in source
+    assert '"CUDAHOSTCXX": host_compiler' in source
+    assert 'host_compiler = "/usr/bin/g++"' in source
+    assert "scripts/check_cuda_toolchain.py" in source
+    assert "NVCC_PREPEND_FLAGS" in source
+    assert "CMAKE_CUDA_HOST_COMPILER" in source
     assert "torch==2.12.0" in source
     assert "LD_LIBRARY_PATH" in source
 
