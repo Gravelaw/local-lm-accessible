@@ -31,6 +31,11 @@ VISION_MODAL_CONFIG = (
 )
 TEXT_PREFLIGHT_REPORT = REPORTS_DIR / "fine_tuning_text_preflight.json"
 VISION_PREFLIGHT_REPORT = REPORTS_DIR / "fine_tuning_vision_preflight.json"
+NEMOTRON_DEPENDENCY_REPORT = REPORTS_DIR / "nemotron_dependency_build.json"
+FINAL_TEXT_ADAPTER_EVAL_JSON = REPORTS_DIR / "final_text_adapter_eval.json"
+FINAL_TEXT_ADAPTER_EVAL_MD = REPORTS_DIR / "final_text_adapter_eval.md"
+FINAL_FINE_TUNING_SUMMARY_JSON = REPORTS_DIR / "final_finetuning_summary.json"
+FINAL_FINE_TUNING_SUMMARY_MD = REPORTS_DIR / "final_finetuning_summary.md"
 
 DATA_VOLUME = modal.Volume.from_name("local-lm-data", create_if_missing=True)
 CACHE_VOLUME = modal.Volume.from_name("local-lm-cache", create_if_missing=True)
@@ -122,6 +127,7 @@ def _run(
     *,
     cwd: Path = REMOTE_ROOT,
     extra_env: dict[str, str] | None = None,
+    timeout_seconds: int | None = None,
 ) -> dict[str, Any]:
     env = os.environ.copy()
     env.setdefault("HF_HOME", "/cache/huggingface")
@@ -163,14 +169,25 @@ def _run(
     )
     if extra_env:
         env.update(extra_env)
-    completed = subprocess.run(
-        command,
-        cwd=cwd,
-        check=False,
-        env=env,
-        text=True,
-        capture_output=True,
-    )
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=cwd,
+            check=False,
+            env=env,
+            text=True,
+            capture_output=True,
+            timeout=timeout_seconds,
+        )
+    except subprocess.TimeoutExpired as exc:
+        result = {
+            "command": command,
+            "stdout": exc.stdout or "",
+            "stderr": exc.stderr or "",
+            "returncode": None,
+            "timeout_seconds": timeout_seconds,
+        }
+        raise TimeoutError(json.dumps(result, indent=2, sort_keys=True)) from exc
     result = {
         "command": command,
         "stdout": completed.stdout,
@@ -180,6 +197,11 @@ def _run(
     if completed.returncode != 0:
         raise RuntimeError(json.dumps(result, indent=2, sort_keys=True))
     return result
+
+
+def _write_json(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
 def _cuda_extension_build_env() -> dict[str, str]:
@@ -463,6 +485,48 @@ def check_training_toolchain() -> dict[str, Any]:
     volumes={str(VOLUME_ROOT): DATA_VOLUME, "/cache": CACHE_VOLUME},
     secrets=[HF_SECRET],
     gpu="A10G",
+    timeout=60 * 90,
+    retries=1,
+)
+def prepare_nemotron_dependencies(timeout_seconds: int = 60 * 45) -> dict[str, Any]:
+    cuda_build_env = _cuda_extension_build_env()
+    cuda_toolchain = _run(
+        ["python", "scripts/check_cuda_toolchain.py"],
+        extra_env=cuda_build_env,
+    )
+    mamba_install = _run(
+        [
+            "python",
+            "-m",
+            "pip",
+            "install",
+            "causal-conv1d>=1.4",
+            "mamba-ssm>=2.2",
+            "--no-build-isolation",
+        ],
+        extra_env=cuda_build_env,
+        timeout_seconds=timeout_seconds,
+    )
+    dependency_check = _run(
+        ["python", "scripts/check_nemotron_dependencies.py"],
+        extra_env=cuda_build_env,
+    )
+    report = {
+        "cuda_toolchain": cuda_toolchain,
+        "mamba_install": mamba_install,
+        "dependency_check": dependency_check,
+        "timeout_seconds": timeout_seconds,
+    }
+    _write_json(NEMOTRON_DEPENDENCY_REPORT, report)
+    _commit_volumes()
+    return report
+
+
+@app.function(
+    image=training_image,
+    volumes={str(VOLUME_ROOT): DATA_VOLUME, "/cache": CACHE_VOLUME},
+    secrets=[HF_SECRET],
+    gpu="A10G",
     timeout=60 * 60 * 8,
     retries=1,
 )
@@ -490,6 +554,11 @@ def finetune_text_nemotron(dry_run: bool = False, limit: int = 16) -> dict[str, 
             "--no-build-isolation",
         ],
         extra_env=cuda_build_env,
+        timeout_seconds=60 * 45,
+    )
+    dependency_check = _run(
+        ["python", "scripts/check_nemotron_dependencies.py"],
+        extra_env=cuda_build_env,
     )
     command = [
         "python",
@@ -500,13 +569,59 @@ def finetune_text_nemotron(dry_run: bool = False, limit: int = 16) -> dict[str, 
     if dry_run:
         command.extend(["--dry-run", "--limit", str(limit)])
     result = _run(command)
+    finalization: dict[str, Any] | None = None
+    if not dry_run:
+        finalization = _run(
+            [
+                "python",
+                "scripts/finalize_text_adapter.py",
+                "--adapter-dir",
+                str(Path("/vol/local-lm/training/text/nemotron_modal_prepared_lora")),
+                "--base-model",
+                "nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16",
+                "--train-file",
+                str(TRAINING_MANIFEST_ROOT / "text_sft_train.jsonl"),
+                "--eval-file",
+                str(TRAINING_MANIFEST_ROOT / "text_sft_validation.jsonl"),
+                "--report-json",
+                str(FINAL_FINE_TUNING_SUMMARY_JSON),
+                "--report-md",
+                str(FINAL_FINE_TUNING_SUMMARY_MD),
+            ]
+        )
     _commit_volumes()
     return {
         "preflight": preflight,
         "cuda_toolchain": cuda_toolchain,
         "mamba_install": mamba_install,
+        "dependency_check": dependency_check,
         "training": result,
+        "finalization": finalization,
     }
+
+
+@app.function(
+    image=training_image,
+    volumes={str(VOLUME_ROOT): DATA_VOLUME, "/cache": CACHE_VOLUME},
+    secrets=[HF_SECRET],
+    gpu="A10G",
+    timeout=60 * 30,
+    retries=1,
+)
+def evaluate_text_adapter() -> dict[str, Any]:
+    command = [
+        "python",
+        "training/text/eval_text_adapter.py",
+        "--input",
+        str(TRAINING_MANIFEST_ROOT / "text_sft_validation.jsonl"),
+        "--report-json",
+        str(FINAL_TEXT_ADAPTER_EVAL_JSON),
+        "--report-md",
+        str(FINAL_TEXT_ADAPTER_EVAL_MD),
+    ]
+    result = _run(command)
+    _commit_volumes()
+    return result
 
 
 @app.function(
@@ -545,6 +660,7 @@ def main(
     targets: str = "",
     max_dataset_size_gb: float = 10.0,
     dry_run: bool = True,
+    dependency_timeout_seconds: int = 60 * 45,
 ) -> None:
     if action == "ingest_data":
         result = ingest_data.remote(targets=targets, max_dataset_size_gb=max_dataset_size_gb)
@@ -566,6 +682,12 @@ def main(
         result = finetune_vision.remote(dry_run=dry_run)
     elif action == "check_training_toolchain":
         result = check_training_toolchain.remote()
+    elif action == "prepare_nemotron_dependencies":
+        result = prepare_nemotron_dependencies.remote(
+            timeout_seconds=dependency_timeout_seconds
+        )
+    elif action == "evaluate_text_adapter":
+        result = evaluate_text_adapter.remote()
     else:
         raise ValueError(f"unsupported action: {action}")
     print(json.dumps(result, indent=2, sort_keys=True))

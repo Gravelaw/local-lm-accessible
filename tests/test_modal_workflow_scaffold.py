@@ -27,6 +27,10 @@ def test_modal_workflow_uses_image_volumes_and_secrets() -> None:
     assert "training/text/train_nemotron_lora.py" in source
     assert "training/vision/train_minicpm_v_lora.py" in source
     assert "check_training_toolchain" in source
+    assert "prepare_nemotron_dependencies" in source
+    assert "evaluate_text_adapter" in source
+    assert "scripts/finalize_text_adapter.py" in source
+    assert "scripts/check_nemotron_dependencies.py" in source
     assert "scripts/preflight_finetuning_manifests.py" in source
     assert "nemotron_modal_prepared_lora.yaml" in source
     assert "minicpm_v_modal_document_lora.yaml" in source
@@ -39,6 +43,7 @@ def test_modal_workflow_uses_image_volumes_and_secrets() -> None:
     assert "CMAKE_CUDA_HOST_COMPILER" in source
     assert "torch==2.12.0" in source
     assert "LD_LIBRARY_PATH" in source
+    assert "timeout_seconds=60 * 45" in source
 
 
 def test_modalignore_excludes_local_artifacts() -> None:

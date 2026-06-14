@@ -17,9 +17,11 @@ from training.text.train_nemotron_lora import (
     configure_local_training_environment,
     dry_run,
     example_fingerprint,
+    latest_checkpoint,
     load_config,
     load_jsonl,
     render_prompt_text,
+    sft_training_args_kwargs,
     tokenize_assistant_only,
     validate_examples,
     validate_train_eval_separation,
@@ -145,6 +147,24 @@ def test_build_tokenized_dataset_outputs_labels() -> None:
     assert len(dataset) == 2
     assert all("labels" in item for item in dataset)
     assert all(any(label != -100 for label in item["labels"]) for item in dataset)
+
+
+def test_latest_checkpoint_picks_highest_numeric_checkpoint(tmp_path: Path) -> None:
+    (tmp_path / "checkpoint-2").mkdir()
+    (tmp_path / "checkpoint-10").mkdir()
+    (tmp_path / "checkpoint-final").mkdir()
+
+    assert latest_checkpoint(tmp_path) == tmp_path / "checkpoint-10"
+
+
+def test_sft_training_args_skip_prepare_for_pretokenized_dataset() -> None:
+    config = load_config(CONFIG_PATH)
+    args = sft_training_args_kwargs(config, bf16=True)
+
+    assert args["max_length"] == config["data"]["max_seq_length"]
+    assert args["dataset_kwargs"] == {"skip_prepare_dataset": True}
+    assert args["remove_unused_columns"] is False
+    assert args["report_to"] == []
 
 
 def test_text_eval_scores_explicit_predictions() -> None:

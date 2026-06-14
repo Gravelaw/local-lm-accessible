@@ -299,8 +299,17 @@ Run the first guarded text adapter job only after dry runs and preflight reports
 pass:
 
 ```bash
+.venv/bin/modal run modal_workflows/local_lm_pipeline.py --action check_training_toolchain
+.venv/bin/modal run modal_workflows/local_lm_pipeline.py --action prepare_nemotron_dependencies
 .venv/bin/modal run modal_workflows/local_lm_pipeline.py --action finetune_text --no-dry-run
+.venv/bin/modal run modal_workflows/local_lm_pipeline.py --action evaluate_text_adapter
 ```
+
+The final text job writes the LoRA adapter under
+`/vol/local-lm/training/text/nemotron_modal_prepared_lora`, emits
+`adapter_manifest.json` with checksum metadata, and writes final reports under
+`/vol/local-lm/reports`. GGUF merge and quantization remain a separate approval
+step after adapter evaluation passes.
 
 The Modal app copies source code into `/workspace/local-lm`, stores data and
 reports on the `local-lm-data` volume under `/vol/local-lm`, and uses

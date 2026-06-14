@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import inspect
 import json
 import os
 from pathlib import Path
@@ -224,6 +225,76 @@ def build_tokenized_dataset(
     return [tokenize_assistant_only(example, tokenizer, max_seq_length) for example in examples]
 
 
+def sft_training_args_kwargs(config: dict[str, Any], *, bf16: bool) -> dict[str, Any]:
+    return {
+        "output_dir": config["training"]["output_dir"],
+        "per_device_train_batch_size": config["training"]["per_device_train_batch_size"],
+        "per_device_eval_batch_size": config["training"]["per_device_eval_batch_size"],
+        "gradient_accumulation_steps": config["training"]["gradient_accumulation_steps"],
+        "learning_rate": config["training"]["learning_rate"],
+        "num_train_epochs": config["training"]["num_train_epochs"],
+        "max_steps": config["training"]["max_steps"],
+        "eval_strategy": "steps",
+        "eval_steps": config["training"]["eval_steps"],
+        "save_steps": config["training"]["save_steps"],
+        "logging_steps": config["training"]["logging_steps"],
+        "save_total_limit": config["training"]["save_total_limit"],
+        "load_best_model_at_end": bool(config["training"]["save_best_adapter"]),
+        "metric_for_best_model": config["training"]["metric_for_best_model"],
+        "greater_is_better": config["training"]["greater_is_better"],
+        "bf16": bf16,
+        "fp16": not bf16 and bool(config["training"]["fp16"]),
+        "report_to": [],
+        "logging_dir": str(Path(config["training"]["output_dir"]) / "logs"),
+        "seed": config["training"]["seed"],
+        "remove_unused_columns": False,
+        "do_train": True,
+        "do_eval": True,
+        "max_length": int(config["data"]["max_seq_length"]),
+        "dataset_kwargs": {"skip_prepare_dataset": True},
+    }
+
+
+def build_sft_trainer(
+    *,
+    sft_trainer_cls: Any,
+    sft_config_cls: Any,
+    model: Any,
+    tokenizer: Any,
+    train_dataset: Any,
+    eval_dataset: Any,
+    peft_config: Any,
+    training_args_kwargs: dict[str, Any],
+    data_collator: Any,
+) -> Any:
+    trainer_signature = inspect.signature(sft_trainer_cls)
+    if sft_config_cls is not None:
+        args = sft_config_cls(**training_args_kwargs)
+    else:
+        from transformers import TrainingArguments
+
+        fallback_kwargs = {
+            key: value
+            for key, value in training_args_kwargs.items()
+            if key not in {"max_length", "dataset_kwargs"}
+        }
+        args = TrainingArguments(**fallback_kwargs)
+    kwargs = {
+        "model": model,
+        "args": args,
+        "train_dataset": train_dataset,
+        "eval_dataset": eval_dataset,
+        "peft_config": peft_config,
+        "data_collator": data_collator,
+    }
+    if "processing_class" in trainer_signature.parameters:
+        kwargs["processing_class"] = tokenizer
+    else:
+        kwargs["tokenizer"] = tokenizer
+        kwargs["max_seq_length"] = int(training_args_kwargs["max_length"])
+    return sft_trainer_cls(**kwargs)
+
+
 def _tokenize_text(tokenizer: Any, text: str) -> list[int]:
     encoded = tokenizer(text, add_special_tokens=False)
     input_ids = encoded["input_ids"] if isinstance(encoded, dict) else encoded.input_ids
@@ -261,14 +332,39 @@ def dry_run(config: dict[str, Any], limit: int) -> dict[str, Any]:
     return summary
 
 
-def train(config: dict[str, Any]) -> None:
+def latest_checkpoint(output_dir: Path) -> Path | None:
+    if not output_dir.exists():
+        return None
+    checkpoints = []
+    for path in output_dir.glob("checkpoint-*"):
+        if not path.is_dir():
+            continue
+        suffix = path.name.removeprefix("checkpoint-")
+        if suffix.isdigit():
+            checkpoints.append((int(suffix), path))
+    if not checkpoints:
+        return None
+    return max(checkpoints, key=lambda item: item[0])[1]
+
+
+def train(config: dict[str, Any]) -> dict[str, Any]:
     configure_local_training_environment(config)
 
     import torch
     from datasets import Dataset
     from peft import LoraConfig, prepare_model_for_kbit_training
-    from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+    from transformers import (
+        AutoModelForCausalLM,
+        AutoTokenizer,
+        BitsAndBytesConfig,
+        DataCollatorForSeq2Seq,
+    )
     from trl import SFTTrainer
+
+    try:
+        from trl import SFTConfig
+    except ImportError:
+        SFTConfig = None
 
     try:
         import bitsandbytes as _bitsandbytes  # noqa: F401
@@ -333,43 +429,45 @@ def train(config: dict[str, Any]) -> None:
         )
     )
 
-    training_args_kwargs = {
-        "output_dir": config["training"]["output_dir"],
-        "per_device_train_batch_size": config["training"]["per_device_train_batch_size"],
-        "per_device_eval_batch_size": config["training"]["per_device_eval_batch_size"],
-        "gradient_accumulation_steps": config["training"]["gradient_accumulation_steps"],
-        "learning_rate": config["training"]["learning_rate"],
-        "num_train_epochs": config["training"]["num_train_epochs"],
-        "max_steps": config["training"]["max_steps"],
-        "eval_strategy": "steps",
-        "eval_steps": config["training"]["eval_steps"],
-        "save_steps": config["training"]["save_steps"],
-        "logging_steps": config["training"]["logging_steps"],
-        "save_total_limit": config["training"]["save_total_limit"],
-        "load_best_model_at_end": bool(config["training"]["save_best_adapter"]),
-        "metric_for_best_model": config["training"]["metric_for_best_model"],
-        "greater_is_better": config["training"]["greater_is_better"],
-        "bf16": bf16,
-        "fp16": not bf16 and bool(config["training"]["fp16"]),
-        "report_to": [],
-        "logging_dir": str(Path(config["training"]["output_dir"]) / "logs"),
-        "seed": config["training"]["seed"],
-    }
-
-    from transformers import TrainingArguments
-
-    trainer = SFTTrainer(
+    training_args_kwargs = sft_training_args_kwargs(config, bf16=bf16)
+    data_collator = DataCollatorForSeq2Seq(
+        tokenizer=tokenizer,
+        label_pad_token_id=-100,
+        pad_to_multiple_of=8,
+    )
+    trainer = build_sft_trainer(
+        sft_trainer_cls=SFTTrainer,
+        sft_config_cls=SFTConfig,
         model=model,
-        args=TrainingArguments(**training_args_kwargs),
+        tokenizer=tokenizer,
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
         peft_config=lora_config,
-        max_seq_length=int(config["data"]["max_seq_length"]),
-        tokenizer=tokenizer,
+        training_args_kwargs=training_args_kwargs,
+        data_collator=data_collator,
     )
-    trainer.train()
+    output_dir = Path(config["training"]["output_dir"])
+    output_dir.mkdir(parents=True, exist_ok=True)
+    resume_checkpoint = latest_checkpoint(output_dir)
+    train_result = trainer.train(
+        resume_from_checkpoint=str(resume_checkpoint) if resume_checkpoint else None
+    )
     trainer.save_model(config["training"]["output_dir"])
     tokenizer.save_pretrained(config["training"]["output_dir"])
+    metrics = dict(getattr(train_result, "metrics", {}) or {})
+    report = {
+        "mode": "train",
+        "base_model": base_model,
+        "output_dir": str(output_dir),
+        "train_examples": len(train_examples),
+        "eval_examples": len(eval_examples),
+        "resume_from_checkpoint": str(resume_checkpoint) if resume_checkpoint else None,
+        "metrics": metrics,
+        "adapter_saved": True,
+    }
+    report_path = output_dir / "final_training_report.json"
+    report_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return report
 
 
 def main() -> None:
@@ -388,7 +486,8 @@ def main() -> None:
         summary = dry_run(config, args.limit)
         print(json.dumps(summary, indent=2, sort_keys=True))
         return
-    train(config)
+    report = train(config)
+    print(json.dumps(report, indent=2, sort_keys=True))
 
 
 if __name__ == "__main__":
