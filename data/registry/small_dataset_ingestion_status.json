@@ -1,0 +1,60 @@
+{
+  "datasets": {
+    "huggingface:google/fleurs": {
+      "error": "",
+      "notes": "{'rows': 0, 'outputs': ['data/raw/datasets/huggingface-google-fleurs/MANUAL_COLLECTION.json'], 'notes': 'FLEURS eval subset requires datasets tooling or explicit file selection.'}",
+      "processed_path": "/home/newthingnow/work-session/local-lm/data/processed/datasets/huggingface-google-fleurs",
+      "raw_path": "/home/newthingnow/work-session/local-lm/data/raw/datasets/huggingface-google-fleurs",
+      "status": "prepared",
+      "updated_at": 1781357402
+    },
+    "huggingface:ryanznie/SROIE_2019_with_labels": {
+      "error": "",
+      "notes": "{'rows': 3898, 'outputs': ['data/processed/datasets/huggingface-ryanznie-sroie-2019-with-labels/file_index.jsonl', 'data/processed/datasets/huggingface-ryanznie-sroie-2019-with-labels/receipt_extraction.jsonl']}",
+      "processed_path": "/home/newthingnow/work-session/local-lm/data/processed/datasets/huggingface-ryanznie-sroie-2019-with-labels",
+      "raw_path": "/home/newthingnow/work-session/local-lm/data/raw/datasets/huggingface-ryanznie-sroie-2019-with-labels",
+      "status": "prepared",
+      "updated_at": 1781357393
+    },
+    "manual:CORD": {
+      "error": "",
+      "notes": "{'rows': 8, 'outputs': ['data/processed/datasets/manual-cord/file_index.jsonl']}",
+      "processed_path": "/home/newthingnow/work-session/local-lm/data/processed/datasets/manual-cord",
+      "raw_path": "/home/newthingnow/work-session/local-lm/data/raw/datasets/manual-cord",
+      "status": "prepared",
+      "updated_at": 1781357402
+    },
+    "manual:FATURA": {
+      "error": "",
+      "notes": "{'rows': 50006, 'outputs': ['data/processed/datasets/manual-fatura/file_index.jsonl', 'data/processed/datasets/manual-fatura/invoice_extraction.jsonl']}",
+      "processed_path": "/home/newthingnow/work-session/local-lm/data/processed/datasets/manual-fatura",
+      "raw_path": "/home/newthingnow/work-session/local-lm/data/raw/datasets/manual-fatura",
+      "status": "prepared",
+      "updated_at": 1781357399
+    },
+    "manual:XFUND": {
+      "error": "",
+      "notes": "{'rows': 2417, 'outputs': ['data/processed/datasets/manual-xfund/file_index.jsonl', 'data/processed/datasets/manual-xfund/form_understanding.jsonl']}",
+      "processed_path": "/home/newthingnow/work-session/local-lm/data/processed/datasets/manual-xfund",
+      "raw_path": "/home/newthingnow/work-session/local-lm/data/raw/datasets/manual-xfund",
+      "status": "prepared",
+      "updated_at": 1781357401
+    },
+    "synthetic:local-lm-regional-documents": {
+      "error": "",
+      "notes": "{'rows': 32, 'outputs': ['data/processed/datasets/synthetic-local-lm-regional-documents/vision_document_extraction.jsonl']}",
+      "processed_path": "/home/newthingnow/work-session/local-lm/data/processed/datasets/synthetic-local-lm-regional-documents",
+      "raw_path": "/home/newthingnow/work-session/local-lm/data/raw/datasets/synthetic-local-lm-regional-documents",
+      "status": "prepared",
+      "updated_at": 1781357404
+    },
+    "uci:online-retail": {
+      "error": "",
+      "notes": "{'rows': 500, 'outputs': ['data/processed/datasets/uci-online-retail/tabular_reasoning_eval.jsonl'], 'downloaded': 'data/raw/datasets/uci-online-retail/online-retail.zip'}",
+      "processed_path": "/home/newthingnow/work-session/local-lm/data/processed/datasets/uci-online-retail",
+      "raw_path": "/home/newthingnow/work-session/local-lm/data/raw/datasets/uci-online-retail",
+      "status": "prepared",
+      "updated_at": 1781357403
+    }
+  }
+}

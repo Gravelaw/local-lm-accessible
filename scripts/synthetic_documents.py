@@ -845,7 +845,7 @@ def synthetic_dataset_candidate(record: dict[str, Any]) -> dict[str, Any]:
     task = str(metadata["task"])
     document_id = str(metadata["document_id"])
     return {
-        "source_catalog": "local-lm synthetic regional documents",
+        "source_catalog": "synthetic",
         "dataset_name": f"synthetic {metadata['document_type']} {document_id}",
         "dataset_url": f"https://example.local/local-lm/synthetic/{document_id}",
         "modality": metadata["modality"],
@@ -854,6 +854,7 @@ def synthetic_dataset_candidate(record: dict[str, Any]) -> dict[str, Any]:
         "countries": [metadata["country"]],
         "languages": metadata["languages"],
         "license_name": metadata["license"],
+        "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
         "commercial_use_allowed": True,
         "redistribution_allowed": True,
         "derivative_use_allowed": True,
@@ -869,7 +870,7 @@ def synthetic_dataset_candidate(record: dict[str, Any]) -> dict[str, Any]:
         "redacted": False,
         "explicit_user_opt_in": False,
         "metadata_only": True,
-        "cloud_hosted": False,
+        "cloud_runtime_dependency": False,
     }
 
 

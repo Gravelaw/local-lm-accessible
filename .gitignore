@@ -13,6 +13,7 @@ htmlcov/
 .venv/
 venv/
 env/
+.local-tools/
 
 # Local service state
 .local_logs/

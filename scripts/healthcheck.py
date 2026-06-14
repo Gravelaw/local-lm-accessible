@@ -134,7 +134,20 @@ def _http_health_ready(
         return False, "health response must be a JSON object", {}
     if not 200 <= status < 300:
         return False, f"HTTP {status}", payload
+    ready_error = _readiness_error(payload)
+    if ready_error:
+        return False, ready_error, payload
     return True, "", payload
+
+
+def _readiness_error(payload: dict[str, Any]) -> str:
+    service_status = payload.get("status")
+    if service_status is not None and service_status != "ok":
+        return f"service reported status={service_status}"
+    model_ready = payload.get("model_ready")
+    if model_ready is not None and model_ready is not True:
+        return "service reported model_ready=false"
+    return ""
 
 
 def main() -> None:

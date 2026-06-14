@@ -52,6 +52,7 @@ def wait_for_http_service(
                 payload = _decode_json_object(body)
                 if require_local_only and payload.get("local_only") is not True:
                     raise ValueError("service did not report local_only=true")
+                _require_ready_payload(payload)
                 return {
                     "name": name,
                     "url": url,
@@ -84,6 +85,15 @@ def _decode_json_object(body: str) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError("service readiness response must be a JSON object")
     return payload
+
+
+def _require_ready_payload(payload: dict[str, Any]) -> None:
+    status = payload.get("status")
+    if status is not None and status != "ok":
+        raise ValueError(f"service reported status={status}")
+    model_ready = payload.get("model_ready")
+    if model_ready is not None and model_ready is not True:
+        raise ValueError("service reported model_ready=false")
 
 
 def main() -> None:

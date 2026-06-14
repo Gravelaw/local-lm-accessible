@@ -1,0 +1,44 @@
+[
+  {
+    "dataset_id": "huggingface:mychen76/invoices-and-receipts_ocr_v1",
+    "dataset_name": "mychen76 invoices-and-receipts OCR v1",
+    "size_bytes": 1500000000,
+    "source_url": "https://huggingface.co/datasets/mychen76/invoices-and-receipts_ocr_v1"
+  },
+  {
+    "dataset_id": "huggingface:Voxel51/consolidated_receipt_dataset",
+    "dataset_name": "Voxel51 consolidated receipt dataset",
+    "size_bytes": 1200000000,
+    "source_url": "https://huggingface.co/datasets/Voxel51/consolidated_receipt_dataset"
+  },
+  {
+    "dataset_id": "kaggle:robikscube/textocr-text-extraction-from-images-dataset",
+    "dataset_name": "TextOCR text extraction from images",
+    "size_bytes": 7000000000,
+    "source_url": "https://www.kaggle.com/datasets/robikscube/textocr-text-extraction-from-images-dataset"
+  },
+  {
+    "dataset_id": "huggingface:facebook/textvqa",
+    "dataset_name": "TextVQA",
+    "size_bytes": 8000000000,
+    "source_url": "https://huggingface.co/datasets/facebook/textvqa"
+  },
+  {
+    "dataset_id": "huggingface:ai4bharat/IndicVoices",
+    "dataset_name": "IndicVoices",
+    "size_bytes": 50000000000,
+    "source_url": "https://huggingface.co/datasets/ai4bharat/IndicVoices"
+  },
+  {
+    "dataset_id": "huggingface:mozilla-foundation/common_voice_17_0",
+    "dataset_name": "Mozilla Common Voice",
+    "size_bytes": 100000000000,
+    "source_url": "https://huggingface.co/datasets/mozilla-foundation/common_voice_17_0"
+  },
+  {
+    "dataset_id": "wikimedia:selected-wikipedia-dumps",
+    "dataset_name": "Selected Wikipedia dumps",
+    "size_bytes": 20000000000,
+    "source_url": "https://dumps.wikimedia.org/"
+  }
+]

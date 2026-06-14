@@ -1,3 +1,25 @@
+general:
+  india: 0.35
+  southeast_asia: 0.20
+  north_america: 0.25
+  europe: 0.20
+
+document_extraction:
+  india: 0.40
+  southeast_asia: 0.25
+  north_america: 0.20
+  europe: 0.15
+
+image_translation:
+  india: 0.35
+  southeast_asia: 0.30
+  north_america: 0.15
+  europe: 0.20
+
+asr:
+  english_and_europe_supported: true
+  indian_and_sea_non_english: experimental
+
 training:
   implemented: false
   allowed_frameworks:
@@ -13,6 +35,7 @@ training:
     - Southeast Asia
     - North America
     - Europe
+
 dataset_policy:
   required_metadata:
     - license

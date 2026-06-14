@@ -88,6 +88,40 @@ def test_wait_for_http_service_requires_local_only_when_requested() -> None:
         )
 
 
+def test_wait_for_http_service_requires_ok_status() -> None:
+    def opener(url: str, timeout: float) -> _ReadyResponse:
+        return _ReadyResponse({"local_only": True, "status": "runtime_unavailable"})
+
+    with pytest.raises(TimeoutError, match="runtime_unavailable"):
+        wait_for_http_service(
+            "http://127.0.0.1:8090/health",
+            name="asr",
+            timeout_seconds=0.1,
+            interval_seconds=0.01,
+            require_local_only=True,
+            opener=opener,
+            sleep=lambda seconds: None,
+            monotonic=_three_ticks(),
+        )
+
+
+def test_wait_for_http_service_requires_ready_model_when_reported() -> None:
+    def opener(url: str, timeout: float) -> _ReadyResponse:
+        return _ReadyResponse({"local_only": True, "status": "ok", "model_ready": False})
+
+    with pytest.raises(TimeoutError, match="model_ready=false"):
+        wait_for_http_service(
+            "http://127.0.0.1:8090/health",
+            name="asr",
+            timeout_seconds=0.1,
+            interval_seconds=0.01,
+            require_local_only=True,
+            opener=opener,
+            sleep=lambda seconds: None,
+            monotonic=_three_ticks(),
+        )
+
+
 def test_start_all_local_uses_readiness_probe_for_requested_services() -> None:
     script = Path("scripts/start_all_local.sh").read_text(encoding="utf-8")
 

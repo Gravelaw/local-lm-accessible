@@ -129,7 +129,7 @@ def test_synthetic_invoice_registry_records_validate_and_approve(tmp_path: Path)
     assert len(candidates) == 2
     assert len({candidate.dataset_name for candidate in candidates}) == 2
     for candidate in candidates:
-        assert candidate.source_catalog == "local-lm synthetic regional documents"
+        assert candidate.source_catalog == "synthetic"
         assert candidate.license_name == "CC0-1.0"
         assert candidate.modality == "image"
         assert candidate.candidate_tasks == ["invoice_extraction"]

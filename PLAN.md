@@ -24,7 +24,7 @@ Current repo state:
 - Hugging Face Space metadata pins `sdk=gradio`, `sdk_version=6.16.0`, `app_file=app.py`, and Python 3.11; `requirements.txt` and `pyproject.toml` use the same Gradio version and include `uvicorn` while keeping training packages optional.
 - Editable dev installs now work through explicit setuptools package discovery, and `ruff check .` passes locally.
 - The release gate now passes with required text, vision, and ASR checksums recorded.
-- The Gradio Settings / Privacy readiness panel embeds a metadata-only release-gate summary without hashing multi-GB model artifacts on page load.
+- The Gradio Settings / Privacy readiness panel calls `run_release_gate(verify_checksums=False)` for a metadata-only release-gate summary without hashing multi-GB model artifacts on page load; the `scripts/release_gate.py` CLI remains the full checksum-verifying gate.
 - The first Gradio screen now includes the hosted-Space privacy disclosure: Space compute is used when hosted, no external model APIs/cloud OCR/telemetry are called, and laptop-local mode uses the same architecture.
 - The Settings / Privacy tab now includes a Gradio-level "Run Local Demo Samples" check that exercises Ask, Read, Document, Image, and Speech sample handlers locally, verifies structured outputs, visible warnings, and document downloads.
 - Milestone 2 ASR runtime metadata is now wired through the gateway and Gradio Speech tab: language, region, country, and explicit experimental opt-in are preserved, and Indian/SEA non-English or unsupported Parakeet languages fail closed with visible local warnings unless opted in.
@@ -40,7 +40,8 @@ Current repo state:
 - A loopback-only Gradio launcher exists at `scripts/start_gradio_app.sh` and disables Gradio analytics by default for local demo runs.
 - llama.cpp text/vision launchers now default to full GPU layer offload (`--n-gpu-layers -1`) and support `LLAMA_REQUIRE_CUDA=1` through `scripts/check_llamacpp_cuda.py` so CUDA-required demos fail fast instead of silently falling back to CPU.
 - Current shell evidence shows CUDA is not usable here: `nvidia-smi` reports GPU access blocked, no `/dev/nvidia*` devices are visible, and CUDA driver API device count is zero. Host GPU visibility/driver setup remains required before GPU demo validation.
-- Real-service smoke now uses a configurable bounded gateway request timeout for slow local inference. With current live services it gets past document timeout but still fails the assistant endpoint check and ASR real-transcription check; ASR reports checksum-ready but falls back because the Transformers ASR runtime is not installed.
+- Real-service smoke uses a configurable bounded gateway request timeout for slow local inference. The exact real-service path still needs to be rerun in the current runtime after text, vision, ASR, and gateway services are started.
+- ASR has a contingency path: if Parakeet cannot provide reliable non-stub local transcriptions in the target runtime, evaluate an alternate local ASR model that satisfies license, vendor/source, offline, checksum, and language/region safety constraints.
 - Dataset registry, synthetic data, training, eval, gateway, and packaging scaffolds exist.
 - Major gaps remain: eval realism with live targets, real-model smoke coverage under the exact demo environment, GPU visibility/latency validation on target laptop hardware, and final quality review.
 
@@ -257,6 +258,11 @@ Acceptance:
 ### 8. ASR Eval And Runtime Completion
 
 Goal: finish eval-first Parakeet support.
+
+Contingency:
+
+- If Parakeet is not viable for the target demo/runtime, select an alternate local ASR model.
+- The replacement must remain local-only, have reviewed license/commercial metadata, be checksum-pinned in `models/manifest.json`, and preserve unsupported-language and experimental-region safeguards.
 
 Implement:
 

@@ -188,9 +188,25 @@ def test_asr_service_accepts_experimental_with_flag() -> None:
     assert request.language == "hi"
 
 
-def test_asr_service_response_flags_unsupported_language(tmp_path: Path) -> None:
+def test_asr_service_response_flags_unsupported_language(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     audio_path = tmp_path / "hi_elderly_eval.wav"
+    model_path = tmp_path / "parakeet-model"
+    model_path.mkdir()
     _write_tiny_wav(audio_path)
+
+    def fake_verify_manifest(model_key: str) -> list[dict[str, object]]:
+        assert model_key == "asr"
+        return [{"path": str(model_path)}]
+
+    def fake_loader(path: Path) -> parakeet_service.Transcriber:
+        assert path == model_path
+        return lambda audio_filepath: {"text": f"transcribed {Path(audio_filepath).name}"}
+
+    monkeypatch.setattr(parakeet_service, "verify_manifest", fake_verify_manifest)
+    monkeypatch.setattr(parakeet_service, "_TRANSCRIBER_LOADER", fake_loader)
     client = TestClient(app)
 
     response = client.post(
@@ -210,6 +226,7 @@ def test_asr_service_response_flags_unsupported_language(tmp_path: Path) -> None
     assert payload["experimental"] is True
     assert payload["unsupported_language"] is True
     assert payload["warnings"]
+    assert payload["artifact_ready"] is True
     assert payload["model_ready"] is True
 
 
@@ -255,6 +272,7 @@ def test_asr_service_uses_verified_local_parakeet_pipeline(
     assert payload["status"] == "ok"
     assert payload["text"] == "hello from local parakeet"
     assert payload["local_only"] is True
+    assert payload["artifact_ready"] is True
     assert payload["model_ready"] is True
     assert loaded_paths == [model_path]
 
@@ -293,11 +311,24 @@ def test_asr_service_falls_back_visibly_when_local_pipeline_cannot_load(
     payload = response.json()
     assert payload["status"] == "stub"
     assert payload["text"] == f"LOCAL_STUB_TRANSCRIPTION_FOR:{audio_path.name}"
-    assert payload["model_ready"] is True
+    assert payload["artifact_ready"] is True
+    assert payload["model_ready"] is False
     assert "mock Parakeet runtime is unavailable" in payload["warnings"]
 
 
-def test_asr_service_health_reports_checksum_ready_model() -> None:
+def test_asr_service_health_reports_runtime_ready_model(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    model_path = tmp_path / "parakeet-model"
+    model_path.mkdir()
+
+    def fake_verify_manifest(model_key: str) -> list[dict[str, object]]:
+        assert model_key == "asr"
+        return [{"path": str(model_path)}]
+
+    monkeypatch.setattr(parakeet_service, "verify_manifest", fake_verify_manifest)
+    monkeypatch.setattr(parakeet_service, "_asr_runtime_warning", lambda: None)
     client = TestClient(app)
 
     response = client.get("/health")
@@ -306,8 +337,39 @@ def test_asr_service_health_reports_checksum_ready_model() -> None:
     payload = response.json()
     assert payload["local_only"] is True
     assert payload["status"] == "ok"
+    assert payload["artifact_ready"] is True
     assert payload["model_ready"] is True
     assert payload["warnings"] == []
+
+
+def test_asr_service_health_reports_runtime_unavailable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    model_path = tmp_path / "parakeet-model"
+    model_path.mkdir()
+
+    def fake_verify_manifest(model_key: str) -> list[dict[str, object]]:
+        assert model_key == "asr"
+        return [{"path": str(model_path)}]
+
+    monkeypatch.setattr(parakeet_service, "verify_manifest", fake_verify_manifest)
+    monkeypatch.setattr(
+        parakeet_service,
+        "_asr_runtime_warning",
+        lambda: "mock Parakeet runtime is unavailable",
+    )
+    client = TestClient(app)
+
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["local_only"] is True
+    assert payload["status"] == "runtime_unavailable"
+    assert payload["artifact_ready"] is True
+    assert payload["model_ready"] is False
+    assert payload["warnings"] == ["mock Parakeet runtime is unavailable"]
 
 
 def test_asr_service_rejects_missing_audio_file() -> None:

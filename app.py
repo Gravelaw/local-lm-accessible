@@ -1,3 +1,5 @@
+# ruff: noqa: E501, SIM117
+
 from __future__ import annotations
 
 import json
@@ -65,23 +67,408 @@ TASK_CHOICES = [
 ]
 APP_CSS = """
 .gradio-container {
-  max-width: 1180px !important;
+  --background-fill-primary: #0b0e17;
+  --background-fill-secondary: #111623;
+  --block-background-fill: #171b2a;
+  --block-border-color: #2a3043;
+  --body-text-color: #f7f8fb;
+  --body-text-color-subdued: #93a0bd;
+  --border-color-primary: #30374d;
+  --border-color-accent: #ee7445;
+  --input-background-fill: #1b2032;
+  --input-border-color: #30374d;
+  --input-placeholder-color: #a2abc3;
+  --button-primary-background-fill: #ee7445;
+  --button-primary-background-fill-hover: #f08257;
+  --button-primary-text-color: #ffffff;
+  max-width: none !important;
+  min-height: 100vh;
+  background: #0b0e17 !important;
+  color: #f7f8fb !important;
   font-size: 18px;
   line-height: 1.5;
+  padding: 0 !important;
+}
+.gradio-container .main {
+  background: #0b0e17 !important;
+}
+.gradio-container .contain,
+.gradio-container .wrap,
+.gradio-container .form,
+.gradio-container .block,
+.gradio-container .block.padded,
+.gradio-container .panel,
+.gradio-container .tabs,
+.gradio-container .tabitem,
+.gradio-container .accordion,
+.gradio-container .json-holder,
+.gradio-container .file-preview {
+  background: transparent !important;
+  color: #f7f8fb !important;
 }
 .gradio-container button {
-  min-height: 52px;
+  background: #202638 !important;
+  border: 1px solid #30374d !important;
+  color: #f7f8fb !important;
+  min-height: 56px;
+  border-radius: 8px !important;
   font-size: 18px !important;
-  padding: 10px 16px !important;
+  font-weight: 700 !important;
+  padding: 12px 18px !important;
 }
-textarea, input {
+.gradio-container button.primary {
+  background: #ee7445 !important;
+  border-color: #ee7445 !important;
+  box-shadow: 0 12px 28px rgba(238, 116, 69, 0.22);
+  color: #ffffff !important;
+}
+textarea, input, select {
+  background: #1b2032 !important;
+  border-color: #30374d !important;
+  color: #f7f8fb !important;
   font-size: 18px !important;
   line-height: 1.45 !important;
 }
+label, .block-title, .wrap .label-wrap span, .gradio-container .prose {
+  color: #eef2ff !important;
+  font-weight: 700 !important;
+}
+.gradio-container .prose p,
+.gradio-container .prose li,
+.gradio-container .prose span {
+  color: #d8def0 !important;
+}
+.form, .block, .panel, .tabs, .tabitem, .accordion {
+  background: transparent !important;
+}
+.local-lm-shell {
+  min-height: 100vh;
+  background: #0b0e17;
+}
+.local-lm-topbar {
+  align-items: center;
+  border-bottom: 1px solid #202638;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  padding: 18px 8vw;
+}
+.local-lm-brand {
+  align-items: center;
+  display: flex;
+  gap: 14px;
+  min-width: 0;
+}
+.local-lm-mark {
+  align-items: center;
+  background: #ee7445;
+  border-radius: 8px;
+  color: #ffffff;
+  display: inline-flex;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 24px;
+  font-weight: 800;
+  height: 52px;
+  justify-content: center;
+  width: 52px;
+}
+.local-lm-name {
+  color: #f7f8fb;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+.local-lm-subtitle,
+.local-lm-muted {
+  color: #93a0bd;
+}
+.local-lm-badges {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  justify-content: flex-end;
+}
+.local-lm-badge {
+  background: #1b2032;
+  border: 1px solid #30374d;
+  border-radius: 999px;
+  color: #aab4cd;
+  display: inline-flex;
+  font-weight: 700;
+  padding: 10px 18px;
+}
+.local-lm-badge.local {
+  background: #132820;
+  border-color: #255143;
+  color: #6bd6a2;
+}
+.local-lm-layout {
+  display: grid;
+  gap: 36px;
+  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+  margin: 0 auto;
+  max-width: 1500px;
+  padding: 28px 8vw 48px;
+}
+.local-lm-rail {
+  align-self: start;
+  background: #0f1320;
+  border: 1px solid #1a2030;
+  border-radius: 8px;
+  padding: 16px;
+  position: sticky;
+  top: 24px;
+}
+.local-lm-rail-title {
+  color: #93a0bd;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 8px 12px 16px;
+  text-transform: uppercase;
+}
+.local-lm-rail-item {
+  align-items: center;
+  border-radius: 8px;
+  color: #94a2c2;
+  display: flex;
+  font-weight: 700;
+  gap: 12px;
+  margin: 8px 0;
+  min-height: 52px;
+  padding: 12px 14px;
+}
+.local-lm-rail-item.active {
+  background: #ee7445;
+  box-shadow: 0 12px 28px rgba(238, 116, 69, 0.22);
+  color: #ffffff;
+}
+.local-lm-rail-icon {
+  align-items: center;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  display: inline-flex;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 14px;
+  height: 28px;
+  justify-content: center;
+  width: 28px;
+}
+.local-lm-content {
+  min-width: 0;
+}
+.local-lm-section-title h2,
+.local-lm-section-title h3 {
+  color: #f7f8fb;
+  font-size: 32px;
+  line-height: 1.15;
+  margin: 0;
+}
+.local-lm-section-title p {
+  color: #9aa7c5;
+  font-size: 22px;
+  margin: 8px 0 20px;
+}
+.local-lm-card {
+  background: #171b2a;
+  border: 1px solid #2a3043;
+  border-radius: 8px;
+  margin-bottom: 18px;
+  padding: 24px;
+}
+.local-lm-card > .block,
+.local-lm-output-card > .block {
+  background: transparent !important;
+}
+.local-lm-card.compact {
+  padding: 20px;
+}
+.local-lm-output-card {
+  background: #111623;
+  border: 1px solid #2a3043;
+  border-radius: 8px;
+  padding: 24px;
+}
+.local-lm-result-drawer {
+  background: #111623 !important;
+  border: 1px solid #2a3043 !important;
+  border-radius: 8px !important;
+  margin-top: 18px;
+}
+.local-lm-result-drawer button {
+  background: #171b2a !important;
+  color: #f7f8fb !important;
+  min-height: 46px !important;
+}
 .local-lm-status {
-  border: 2px solid #111827;
-  padding: 12px;
+  background: #121827;
+  border: 1px solid #2a3043;
+  border-radius: 8px;
+  color: #d8def0;
+  padding: 16px 18px;
+  font-size: 17px;
+}
+.local-lm-status strong {
+  color: #6bd6a2;
+}
+.local-lm-disclosure {
+  border-left: 4px solid #ee7445;
+}
+.local-lm-footer {
+  align-items: center;
+  border-top: 1px solid #202638;
+  color: #93a0bd;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  justify-content: space-between;
+  padding: 24px 8vw;
+}
+.local-lm-cap {
+  color: #6bd6a2;
+  font-weight: 800;
+}
+.local-lm-tabs .tab-nav {
+  background: #0f1320 !important;
+  border: 1px solid #1f2536 !important;
+  border-radius: 8px !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  margin-bottom: 28px !important;
+  overflow: visible !important;
+  padding: 8px !important;
+}
+.local-lm-tabs .tab-container {
+  background: #0f1320 !important;
+  border: 1px solid #1f2536 !important;
+  border-radius: 8px !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  overflow: visible !important;
+  padding: 8px !important;
+}
+.local-lm-tabs .tab-nav button {
+  border-radius: 8px !important;
+  color: #96a2bf !important;
+  flex: 0 1 auto !important;
+  min-height: 48px !important;
+}
+.local-lm-tabs .tab-container button {
+  border-radius: 8px !important;
+  color: #96a2bf !important;
+  flex: 0 1 auto !important;
+  min-height: 48px !important;
+}
+.local-lm-tabs .tab-nav button.selected {
+  background: #ee7445 !important;
+  color: #ffffff !important;
+}
+.local-lm-tabs .tab-container button.selected {
+  background: #ee7445 !important;
+  color: #ffffff !important;
+}
+.local-lm-uploader .wrap,
+.local-lm-uploader .upload-container,
+.local-lm-uploader .file-preview,
+.local-lm-uploader .image-container,
+.local-lm-uploader .audio-container {
+  background: #171b2a !important;
+  border: 2px dashed #3a4158 !important;
+  border-radius: 8px !important;
+  min-height: 190px;
+}
+.local-lm-settings-panel {
+  background: #171b2a;
+  border: 1px solid #2a3043;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.local-lm-panel-head {
+  background: #222842;
+  color: #6bd6a2;
   font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  padding: 18px 22px;
+  text-transform: uppercase;
+}
+.local-lm-panel-body {
+  padding: 22px;
+}
+.local-lm-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.local-lm-chip {
+  background: #152820;
+  border: 1px solid #2b5749;
+  border-radius: 6px;
+  color: #6bd6a2;
+  display: inline-flex;
+  font-weight: 700;
+  padding: 8px 12px;
+}
+.local-lm-chip.warn {
+  background: #2b2419;
+  border-color: #6c5430;
+  color: #f1cc68;
+}
+.local-lm-sr-only {
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+@media (max-width: 980px) {
+  .local-lm-topbar,
+  .local-lm-footer {
+    align-items: flex-start;
+    padding-left: 22px;
+    padding-right: 22px;
+  }
+  .local-lm-topbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 12px;
+  }
+  .local-lm-badges {
+    align-content: start;
+    flex-direction: row;
+    gap: 8px;
+    justify-content: flex-start;
+  }
+  .local-lm-badge {
+    padding: 8px 12px;
+  }
+  .local-lm-name {
+    font-size: 24px;
+  }
+  .local-lm-layout {
+    grid-template-columns: 1fr;
+    padding: 22px 18px 42px;
+  }
+  .local-lm-rail {
+    display: none !important;
+  }
+  .local-lm-section-title h2,
+  .local-lm-section-title h3 {
+    font-size: 28px;
+  }
+  .local-lm-section-title p {
+    font-size: 19px;
+  }
+  .local-lm-card {
+    padding: 18px;
+  }
 }
 """
 HIGH_CONTRAST_CSS = """
@@ -103,6 +490,13 @@ HIGH_CONTRAST_CSS = """
   background: #ffd400 !important;
   color: #000 !important;
   border-color: #ffd400 !important;
+}
+.local-lm-card,
+.local-lm-output-card,
+.local-lm-rail,
+.local-lm-settings-panel {
+  background: #000 !important;
+  border-color: #fff !important;
 }
 .gradio-container a {
   color: #7dd3fc !important;
@@ -734,7 +1128,7 @@ def _save_named_text_result(
     return save_text_result_exports(base_name, text or "", payload, formats or [])
 
 
-def build_demo() -> gr.Blocks:
+def build_demo_legacy() -> gr.Blocks:
     with gr.Blocks(
         title="local-lm",
         analytics_enabled=False,
@@ -957,8 +1351,8 @@ def build_demo() -> gr.Blocks:
                     run_local_demo_flow,
                     outputs=[demo_flow_summary, demo_flow_json],
                 )
-                high_contrast = gr.Checkbox(label="High contrast mode", value=True)
-                accessibility_css = gr.HTML(value=accessibility_style(True), show_label=False)
+                high_contrast = gr.Checkbox(label="High contrast mode", value=False)
+                accessibility_css = gr.HTML(value=accessibility_style(False), show_label=False)
                 accessibility_output = gr.Markdown()
                 model_budget = gr.JSON(label="Model budget")
                 demo.load(
@@ -972,6 +1366,476 @@ def build_demo() -> gr.Blocks:
                     outputs=[accessibility_output, accessibility_css],
                 )
                 demo.load(model_budget_status, outputs=[model_budget])
+    return demo
+
+
+def build_demo() -> gr.Blocks:
+    with gr.Blocks(
+        title="local-lm",
+        analytics_enabled=False,
+    ) as demo:
+        gr.HTML(value=base_style_html(), show_label=False)
+        gr.Markdown("# local-lm", elem_classes=["local-lm-sr-only"])
+        gr.HTML(
+            """
+            <div class="local-lm-topbar">
+              <div class="local-lm-brand">
+                <div class="local-lm-mark">LM</div>
+                <div>
+                  <div class="local-lm-name">local-lm</div>
+                  <div class="local-lm-subtitle">Backyard AI - HF Build Small Hackathon</div>
+                </div>
+              </div>
+              <div class="local-lm-badges">
+                <span class="local-lm-badge local">Local only</span>
+                <span class="local-lm-badge">~8.6B active params</span>
+              </div>
+            </div>
+            """,
+            show_label=False,
+        )
+        gr.Markdown(
+            first_screen_disclosure(),
+            elem_classes=["local-lm-status", "local-lm-disclosure"],
+        )
+        with gr.Row(elem_classes=["local-lm-layout"]):
+            with gr.Column(scale=1, min_width=240, elem_classes=["local-lm-rail"]):
+                gr.HTML(
+                    """
+                    <div class="local-lm-rail-title">Tasks</div>
+                    <div class="local-lm-rail-item"><span class="local-lm-rail-icon">RD</span>Read & Summarise</div>
+                    <div class="local-lm-rail-item"><span class="local-lm-rail-icon">DC</span>Convert Document</div>
+                    <div class="local-lm-rail-item"><span class="local-lm-rail-icon">IM</span>Describe Image</div>
+                    <div class="local-lm-rail-item"><span class="local-lm-rail-icon">TR</span>Translate Image Text</div>
+                    <div class="local-lm-rail-item"><span class="local-lm-rail-icon">ST</span>Speech to Text</div>
+                    <div class="local-lm-rail-item"><span class="local-lm-rail-icon">PR</span>Privacy & Settings</div>
+                    """,
+                    show_label=False,
+                )
+                health_text = gr.Markdown(elem_classes=["local-lm-status"])
+                with gr.Accordion(ADVANCED_RUNTIME_LABEL, open=False):
+                    health_json = gr.JSON(label="Runtime")
+
+            with (
+                gr.Column(scale=4, min_width=520, elem_classes=["local-lm-content"]),
+                gr.Tabs(elem_classes=["local-lm-tabs"]),
+            ):
+                    with gr.Tab("Read"):
+                        gr.HTML(
+                            """
+                            <div class="local-lm-section-title">
+                              <h2>Read & Summarise</h2>
+                              <p>Paste text, load a local document sample, or enter a URL to get a simple summary.</p>
+                            </div>
+                            """,
+                            show_label=False,
+                        )
+                        with gr.Group(elem_classes=["local-lm-card"]):
+                            load_article_button = gr.Button("Load sample file")
+                            article_text = gr.Textbox(
+                                label="Paste your article or document text below",
+                                lines=6,
+                                placeholder="Paste text here - article, Wikipedia page, or any document...",
+                            )
+                            article_url = gr.Textbox(
+                                label="Optional web URL",
+                                placeholder="URL summarisation stays blocked unless web fetch is enabled.",
+                            )
+                            article_allow_web = gr.Checkbox(
+                                label="Allow optional web fetch",
+                                value=False,
+                            )
+                            article_button = gr.Button("Summarise", variant="primary")
+                        with gr.Accordion(
+                            "Summary and exports",
+                            open=False,
+                            elem_classes=["local-lm-result-drawer"],
+                        ):
+                            with gr.Group(elem_classes=["local-lm-output-card"]):
+                                article_output = gr.Textbox(label="Summary", lines=8)
+                                article_status = gr.JSON(label="Status")
+                                article_save_formats = gr.CheckboxGroup(
+                                    ["TXT", "XLSX", "PDF"],
+                                    label="Save result as",
+                                    value=["TXT", "PDF"],
+                                )
+                                article_save_button = gr.Button("Save Summary")
+                                article_files = gr.File(label="Saved summary", file_count="multiple")
+                                article_save_status = gr.Textbox(label="Save status", lines=1)
+                        article_button.click(
+                            summarize_article,
+                            inputs=[article_text, article_url, article_allow_web],
+                            outputs=[article_output, article_status],
+                        )
+                        load_article_button.click(load_demo_article, outputs=[article_text])
+                        article_save_button.click(
+                            save_article_result,
+                            inputs=[article_output, article_status, article_save_formats],
+                            outputs=[article_files, article_save_status],
+                        )
+
+                    with gr.Tab("Docs"):
+                        gr.HTML(
+                            """
+                            <div class="local-lm-section-title">
+                              <h2>Convert Document</h2>
+                              <p>Upload a bill, invoice, receipt, handwritten note, or bank statement and save structured local exports.</p>
+                            </div>
+                            """,
+                            show_label=False,
+                        )
+                        with gr.Group(elem_classes=["local-lm-card"]):
+                            with gr.Row():
+                                sample_document = gr.Dropdown(
+                                    ["invoice", "bank_statement"],
+                                    label="Demo sample",
+                                    value="invoice",
+                                )
+                                load_document_button = gr.Button("Load sample file")
+                            document_file = gr.File(
+                                label="Click to upload or drag and drop a document",
+                                file_types=[".pdf", ".png", ".jpg", ".jpeg", ".webp", ".txt"],
+                                type="filepath",
+                                elem_classes=["local-lm-uploader"],
+                            )
+                            export_formats = gr.CheckboxGroup(
+                                ["JSON", "XLSX", "TXT", "PDF"],
+                                label="Save as",
+                                value=["JSON", "XLSX"],
+                            )
+                            document_button = gr.Button("Convert to Excel + JSON", variant="primary")
+                        with gr.Accordion(
+                            "Extracted data and downloads",
+                            open=False,
+                            elem_classes=["local-lm-result-drawer"],
+                        ):
+                            with gr.Group(elem_classes=["local-lm-output-card"]):
+                                document_json = gr.Textbox(label="Extracted JSON", lines=12)
+                                document_files = gr.File(label="Downloads", file_count="multiple")
+                                document_warnings = gr.Textbox(label="Warnings", lines=3)
+                        document_button.click(
+                            convert_document,
+                            inputs=[document_file, export_formats],
+                            outputs=[document_json, document_files, document_warnings],
+                        )
+                        load_document_button.click(
+                            load_demo_document,
+                            inputs=[sample_document],
+                            outputs=[document_file],
+                        )
+
+                    with gr.Tab("Image"):
+                        gr.HTML(
+                            """
+                            <div class="local-lm-section-title">
+                              <h2>Describe Image</h2>
+                              <p>Upload a photo to get a simple accessible description with visible text and hazard warnings.</p>
+                            </div>
+                            """,
+                            show_label=False,
+                        )
+                        with gr.Group(elem_classes=["local-lm-card"]):
+                            load_image_button = gr.Button("Load sample image")
+                            image_file = gr.Image(
+                                label="Click to upload or drag and drop an image",
+                                sources=["upload", "webcam", "clipboard"],
+                                type="filepath",
+                                elem_classes=["local-lm-uploader"],
+                            )
+                            describe_button = gr.Button("Describe Image", variant="primary")
+                        with gr.Accordion(
+                            "Description and exports",
+                            open=False,
+                            elem_classes=["local-lm-result-drawer"],
+                        ):
+                            with gr.Group(elem_classes=["local-lm-output-card"]):
+                                image_text = gr.Textbox(label="Accessible result", lines=8)
+                                image_status = gr.JSON(label="Status")
+                                image_save_formats = gr.CheckboxGroup(
+                                    ["TXT", "XLSX", "PDF"],
+                                    label="Save result as",
+                                    value=["TXT", "PDF"],
+                                )
+                                image_save_button = gr.Button("Save Image Result")
+                                image_files = gr.File(label="Saved image result", file_count="multiple")
+                                image_save_status = gr.Textbox(label="Save status", lines=1)
+                        describe_button.click(
+                            describe_photo,
+                            inputs=[image_file],
+                            outputs=[image_text, image_status],
+                        )
+                        load_image_button.click(load_demo_image, outputs=[image_file])
+                        image_save_button.click(
+                            save_image_result,
+                            inputs=[image_text, image_status, image_save_formats],
+                            outputs=[image_files, image_save_status],
+                        )
+
+                    with gr.Tab("Text"):
+                        gr.HTML(
+                            """
+                            <div class="local-lm-section-title">
+                              <h2>Translate Image Text</h2>
+                              <p>Upload a sign, label, menu, notice, or document and translate the visible text.</p>
+                            </div>
+                            """,
+                            show_label=False,
+                        )
+                        with gr.Group(elem_classes=["local-lm-card"]):
+                            translate_image_file = gr.Image(
+                                label="Upload image with text to translate",
+                                sources=["upload", "webcam", "clipboard"],
+                                type="filepath",
+                                elem_classes=["local-lm-uploader"],
+                            )
+                            target_language = gr.Textbox(label="Translate to", value="English")
+                            translate_button = gr.Button("Extract & Translate", variant="primary")
+                            load_translate_image_button = gr.Button("Load sample image")
+                        with gr.Accordion(
+                            "Translation result",
+                            open=False,
+                            elem_classes=["local-lm-result-drawer"],
+                        ):
+                            with gr.Group(elem_classes=["local-lm-output-card"]):
+                                translate_text = gr.Textbox(label="Translation result", lines=8)
+                                translate_status = gr.JSON(label="Status")
+                        translate_button.click(
+                            translate_visible_text,
+                            inputs=[translate_image_file, target_language],
+                            outputs=[translate_text, translate_status],
+                        )
+                        load_translate_image_button.click(
+                            load_demo_image,
+                            outputs=[translate_image_file],
+                        )
+
+                    with gr.Tab("Speech"):
+                        gr.HTML(
+                            """
+                            <div class="local-lm-section-title">
+                              <h2>Speech to Text</h2>
+                              <p>Record or upload audio to get a local transcript.</p>
+                            </div>
+                            """,
+                            show_label=False,
+                        )
+                        with gr.Group(elem_classes=["local-lm-card"]):
+                            load_audio_button = gr.Button("Load sample speech")
+                            audio_file = gr.Audio(
+                                label="Record from microphone or upload audio",
+                                sources=["upload", "microphone"],
+                                type="filepath",
+                                elem_classes=["local-lm-uploader"],
+                            )
+                            with gr.Row():
+                                speech_language = gr.Textbox(label="Language code", value="en")
+                                speech_region = gr.Dropdown(
+                                    ["unknown", "india", "southeast_asia", "north_america", "europe"],
+                                    label="Region",
+                                    value="unknown",
+                                )
+                            speech_allow_experimental = gr.Checkbox(
+                                label="Allow experimental ASR",
+                                info="Use only for unevaluated regional languages; results require review.",
+                                value=False,
+                            )
+                            gr.HTML(
+                                """
+                                <div class="local-lm-chip-row">
+                                  <span class="local-lm-chip">English</span>
+                                  <span class="local-lm-chip">Spanish</span>
+                                  <span class="local-lm-chip">French</span>
+                                  <span class="local-lm-chip">German</span>
+                                  <span class="local-lm-chip">Italian</span>
+                                  <span class="local-lm-chip warn">Hindi experimental</span>
+                                  <span class="local-lm-chip warn">Tamil experimental</span>
+                                  <span class="local-lm-chip warn">Bahasa Melayu experimental</span>
+                                </div>
+                                """,
+                                show_label=False,
+                            )
+                            speech_button = gr.Button("Transcribe", variant="primary")
+                        with gr.Accordion(
+                            "Transcript and exports",
+                            open=False,
+                            elem_classes=["local-lm-result-drawer"],
+                        ):
+                            with gr.Group(elem_classes=["local-lm-output-card"]):
+                                speech_text = gr.Textbox(label="Transcript", lines=6)
+                                speech_status = gr.JSON(label="Status")
+                                speech_save_formats = gr.CheckboxGroup(
+                                    ["TXT", "XLSX", "PDF"],
+                                    label="Save result as",
+                                    value=["TXT", "PDF"],
+                                )
+                                speech_save_button = gr.Button("Save Transcript")
+                                speech_files = gr.File(label="Saved transcript", file_count="multiple")
+                                speech_save_status = gr.Textbox(label="Save status", lines=1)
+                        speech_button.click(
+                            transcribe_speech,
+                            inputs=[
+                                audio_file,
+                                speech_language,
+                                speech_region,
+                                speech_allow_experimental,
+                            ],
+                            outputs=[speech_text, speech_status],
+                        )
+                        load_audio_button.click(load_demo_audio, outputs=[audio_file])
+                        speech_save_button.click(
+                            save_speech_result,
+                            inputs=[speech_text, speech_status, speech_save_formats],
+                            outputs=[speech_files, speech_save_status],
+                        )
+
+                    with gr.Tab("Ask"):
+                        gr.HTML(
+                            """
+                            <div class="local-lm-section-title">
+                              <h2>Ask Local Assistant</h2>
+                              <p>Ask a short question and get a speech-ready answer with warnings when review is needed.</p>
+                            </div>
+                            """,
+                            show_label=False,
+                        )
+                        with gr.Group(elem_classes=["local-lm-card"]):
+                            load_question_button = gr.Button("Load sample question")
+                            ask_text = gr.Textbox(label="Question", lines=4)
+                            ask_button = gr.Button("Ask", variant="primary")
+                        with gr.Accordion(
+                            "Answer and exports",
+                            open=False,
+                            elem_classes=["local-lm-result-drawer"],
+                        ):
+                            with gr.Group(elem_classes=["local-lm-output-card"]):
+                                ask_output = gr.Textbox(label="Answer", lines=8)
+                                ask_status = gr.JSON(label="Status")
+                                ask_save_formats = gr.CheckboxGroup(
+                                    ["TXT", "XLSX", "PDF"],
+                                    label="Save result as",
+                                    value=["TXT", "PDF"],
+                                )
+                                ask_save_button = gr.Button("Save Answer")
+                                ask_files = gr.File(label="Saved answer", file_count="multiple")
+                                ask_save_status = gr.Textbox(label="Save status", lines=1)
+                        ask_button.click(
+                            ask_assistant,
+                            inputs=[ask_text],
+                            outputs=[ask_output, ask_status],
+                        )
+                        load_question_button.click(load_demo_question, outputs=[ask_text])
+                        ask_save_button.click(
+                            save_ask_result,
+                            inputs=[ask_output, ask_status, ask_save_formats],
+                            outputs=[ask_files, ask_save_status],
+                        )
+
+                    with gr.Tab("Route"):
+                        gr.HTML(
+                            """
+                            <div class="local-lm-section-title">
+                              <h2>Route a Task</h2>
+                              <p>Inspect deterministic routing for a typed intent, local file, or optional URL.</p>
+                            </div>
+                            """,
+                            show_label=False,
+                        )
+                        with gr.Group(elem_classes=["local-lm-card"]):
+                            route_intent_box = gr.Textbox(label="Intent", lines=3)
+                            route_file = gr.File(label="Optional local file", type="filepath")
+                            route_url = gr.Textbox(label="Optional URL")
+                            route_allow_web = gr.Checkbox(label="Allow optional web fetch", value=False)
+                            route_override = gr.Dropdown(
+                                TASK_CHOICES,
+                                label="Manual task override",
+                                value=AUTO_ROUTE,
+                            )
+                            route_button = gr.Button("Route", variant="primary")
+                        with gr.Accordion(
+                            "Route result",
+                            open=False,
+                            elem_classes=["local-lm-result-drawer"],
+                        ):
+                            route_output = gr.JSON(label="Route", elem_classes=["local-lm-output-card"])
+                        route_button.click(
+                            route_intent,
+                            inputs=[
+                                route_intent_box,
+                                route_file,
+                                route_url,
+                                route_allow_web,
+                                route_override,
+                            ],
+                            outputs=[route_output],
+                        )
+
+                    with gr.Tab("Prefs"):
+                        gr.HTML(
+                            """
+                            <div class="local-lm-section-title">
+                              <h2>Privacy & Settings</h2>
+                              <p>Manage privacy mode, model details, demo readiness, and accessibility options.</p>
+                            </div>
+                            <div class="local-lm-settings-panel">
+                              <div class="local-lm-panel-head">Privacy & Locality</div>
+                              <div class="local-lm-panel-body">
+                                <div class="local-lm-chip-row">
+                                  <span class="local-lm-chip">No cloud inference</span>
+                                  <span class="local-lm-chip">No cloud OCR</span>
+                                  <span class="local-lm-chip">No remote telemetry</span>
+                                  <span class="local-lm-chip warn">Web fetch disabled by default</span>
+                                </div>
+                              </div>
+                            </div>
+                            """,
+                            show_label=False,
+                        )
+                        gr.Markdown(privacy_disclosure(), elem_classes=["local-lm-status"])
+                        with gr.Group(elem_classes=["local-lm-card"]):
+                            high_contrast = gr.Checkbox(label="High contrast mode", value=False)
+                            accessibility_css = gr.HTML(value=accessibility_style(False), show_label=False)
+                            accessibility_output = gr.Markdown()
+                            model_budget = gr.JSON(label="Model budget")
+                        with gr.Accordion(
+                            "Readiness and demo flow",
+                            open=False,
+                            elem_classes=["local-lm-result-drawer"],
+                        ):
+                            with gr.Group(elem_classes=["local-lm-output-card"]):
+                                readiness_markdown = gr.Markdown()
+                                readiness_json = gr.JSON(label="Demo readiness")
+                                demo_flow_button = gr.Button("Run Local Demo Samples", variant="primary")
+                                demo_flow_summary = gr.Markdown()
+                                demo_flow_json = gr.JSON(label="Local demo flow")
+                        demo.load(
+                            demo_readiness_status,
+                            outputs=[readiness_markdown, readiness_json],
+                        )
+                        demo_flow_button.click(
+                            run_local_demo_flow,
+                            outputs=[demo_flow_summary, demo_flow_json],
+                        )
+                        demo.load(
+                            accessibility_settings,
+                            inputs=[high_contrast],
+                            outputs=[accessibility_output, accessibility_css],
+                        )
+                        high_contrast.change(
+                            accessibility_settings,
+                            inputs=[high_contrast],
+                            outputs=[accessibility_output, accessibility_css],
+                        )
+                        demo.load(model_budget_status, outputs=[model_budget])
+        gr.HTML(
+            """
+            <div class="local-lm-footer">
+              <span>local-lm - Hugging Face Build Small Hackathon - Backyard AI track</span>
+              <span>Models: Nemotron 3.97B - MiniCPM-V ~4B - Parakeet 0.6B <span class="local-lm-cap">&lt;=32B cap</span></span>
+            </div>
+            """,
+            show_label=False,
+        )
+        demo.load(space_health, outputs=[health_text, health_json])
     return demo
 
 

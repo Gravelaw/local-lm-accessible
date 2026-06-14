@@ -227,6 +227,23 @@ def test_healthcheck_require_running_rejects_bad_http_readiness() -> None:
         check_ports(require_running=True, opener=opener)
 
 
+def test_healthcheck_require_running_rejects_runtime_unavailable_status() -> None:
+    def opener(url: str, timeout: float) -> _HealthResponse:
+        if url == "http://127.0.0.1:8090/health":
+            return _HealthResponse(
+                {
+                    "status": "runtime_unavailable",
+                    "local_only": True,
+                    "artifact_ready": True,
+                    "model_ready": False,
+                }
+            )
+        return _HealthResponse({"status": "ok", "local_only": True})
+
+    with pytest.raises(ConnectionError, match="runtime_unavailable"):
+        check_ports(require_running=True, opener=opener)
+
+
 def test_healthcheck_require_running_allows_optional_http_readiness_failure() -> None:
     def opener(url: str, timeout: float) -> _HealthResponse:
         if url == "http://127.0.0.1:8083/health":

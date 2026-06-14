@@ -50,7 +50,7 @@ This register is now being maintained as implementation progresses.
 - Hugging Face Space metadata, `requirements.txt`, and `pyproject.toml` now pin the same Gradio SDK version; runtime requirements include `uvicorn` for local service startup while keeping training-heavy packages out.
 - Editable dev installs now use explicit setuptools package discovery, and `ruff check .` passes locally after applying project-wide formatting/lint fixes.
 - Release gate CLI failures now emit structured JSON with `failures` and `next_actions`, while preserving a nonzero exit code for automation.
-- Gradio readiness now surfaces a metadata-only release-gate summary, including ASR blocker details and next actions, without performing full checksum hashing during page load.
+- Gradio readiness now calls `run_release_gate(verify_checksums=False)` for a metadata-only release-gate summary, including ASR blocker details and next actions, without performing full checksum hashing during page load. The CLI `scripts/release_gate.py` remains the full checksum-verifying gate.
 - Gradio first-screen disclosure now states the hosted-Space compute boundary, no external model APIs/cloud OCR/telemetry, and laptop-local architecture before users open Settings.
 - Gradio Settings / Privacy now exposes a local demo-flow check that runs the sample Ask, Read, Document, Image, and Speech handlers and verifies structured local outputs, visible warnings, and document downloads.
 - Gateway and Gradio ASR requests now preserve language, region, country, and explicit experimental opt-in; unsupported or Indian/SEA non-English Parakeet requests fail closed locally with warnings unless opted in.
@@ -87,8 +87,9 @@ This register is now being maintained as implementation progresses.
 - Vision/document extraction from images is wired through the local vision endpoint contract, but real MiniCPM-V execution still depends on starting a verified local vision service.
 - `evals/run_all_evals.py` still defaults to deterministic sample predictions unless live local text/vision endpoints are explicitly enabled.
 - Smoke tests can now require real local model-service readiness, but the exact real-service smoke path still needs to be rerun under the final demo hardware and dependency environment.
+- ASR runtime readiness is still a demo risk. If Parakeet cannot produce non-stub local transcriptions reliably in the target runtime, evaluate an alternate local ASR model with a compatible license, offline artifact path, checksum manifest entry, and the same language/region safeguards.
 - CUDA GPU execution is not verified in this shell. `nvidia-smi` reports GPU access blocked, no NVIDIA device nodes are visible, and the CUDA driver API reports zero devices; the current runtime can only validate CPU fallback until host GPU access is fixed.
-- Current live real-service smoke still fails the assistant text endpoint check and ASR real-transcription check. ASR health reports the artifact is checksum-ready, but `/tasks/speech_to_text` returns a local stub because the Transformers ASR runtime is not installed.
+- Current live real-service startup now fails closed at ASR readiness when the runtime cannot prove `model_ready=true`; the Parakeet artifact is checksum-ready, but non-stub transcription still requires a working local Transformers ASR runtime or an approved alternate ASR model.
 
 ## Project Structure Map
 
@@ -126,10 +127,8 @@ This register is now being maintained as implementation progresses.
 
 ### Deployment And Runtime
 
-- `scripts/start_text_llamacpp.sh` and `scripts/start_vision_llamacpp.sh`: path overrides can bypass checksum gates by verifying the manifest path but starting `TEXT_MODEL_PATH` or `VISION_MODEL_PATH`.
-- `training/text/run_llama_server.sh`: can start unchecked and can bind to non-local hosts through `LLAMA_HOST=0.0.0.0`.
-- `scripts/healthcheck.py --gateway` and `scripts/smoke_test_local.py --gateway`: arbitrary remote gateway URLs are accepted.
-- `scripts/smoke_test_local.py`: smoke test is not end-to-end; it writes invoice JSON/XLSX from ground truth and calls gateway stubs.
+- Real-service smoke still needs a fresh pass in the target runtime with text, vision, ASR, and gateway services running.
+- CUDA/GPU execution is not verified in this shell; GPU-required demos must run `scripts/check_llamacpp_cuda.py --require` in an environment where NVIDIA device nodes are visible.
 
 ## Non-Blocking Issues
 
@@ -188,16 +187,17 @@ This register is now being maintained as implementation progresses.
 
 ### Deployment And Runtime
 
-- `training/text/run_llama_server.sh` must reject non-loopback hosts and verify checksums.
+- Real-service smoke should be covered by a repeatable target-hardware run record.
 
 ## Recommended Next PRs
 
 1. Registry hardening: split approved training datasets from research/eval-only datasets, add strict license evidence fields, and normalize metadata schemas.
 2. Training correctness: add assistant-only masking, real adapter eval, reproducible dependency pins, offline/local-files controls, and ASR manifest validation before training.
 3. Vision training: add a proper local MiniCPM-V scaffold or explicitly defer it with acceptance criteria.
-4. Eval harness v2: evaluate HF base, PEFT adapter, merged HF, GGUF, and llama.cpp endpoint targets with local network guards.
-5. Deployment hardening: derive paths and ports from the manifest, reject unsafe overrides, validate loopback URLs, add release manifest gates, and generate checksums after quantization.
-6. End-to-end smoke: use local or mocked llama.cpp-compatible services plus real synthetic PNG, JSON, and XLSX fixtures.
+4. Eval harness v2: increase live-target coverage for HF base, PEFT adapter, merged HF, GGUF, and llama.cpp endpoint targets with local network guards.
+5. ASR model contingency: if Parakeet remains unavailable or too slow, select and validate an alternate local ASR model that satisfies vendor/license/offline constraints.
+6. Real-service demo validation: run text, vision, ASR, gateway, healthcheck, and `scripts/smoke_test_local.py --require-real-model-services` on the target hardware.
+7. GPU validation: verify CUDA visibility and latency on the target laptop before recording or live review.
 
 ## Files That Need Changes
 

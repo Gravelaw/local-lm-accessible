@@ -3,7 +3,7 @@ requires = ["setuptools>=69"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "local-lm-accessible"
+name = "local-lm"
 version = "0.1.0"
 description = "Local-first accessible small-model assistant for elderly and low-vision users."
 requires-python = ">=3.11"
@@ -24,6 +24,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+  "playwright>=1.60",
   "pytest>=8.0",
   "ruff>=0.6",
 ]

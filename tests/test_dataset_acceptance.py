@@ -9,15 +9,19 @@ from data.schemas.source_registry import DatasetCandidate
 
 def _candidate(**overrides: object) -> DatasetCandidate:
     values = {
-        "source_catalog": "unit-test",
+        "dataset_id": "manual:unit",
         "dataset_name": "unit dataset",
-        "dataset_url": "https://example.com/dataset",
+        "source_catalog": "manual",
+        "source_url": "https://example.com/dataset",
+        "access_date": "2026-06-13",
+        "discovered_by": "unit test",
         "modality": "text",
-        "candidate_tasks": ["qa"],
+        "candidate_tasks": ["text_summarization"],
         "regions": ["Europe"],
         "countries": ["France"],
         "languages": ["fr"],
         "license_name": "CC-BY-4.0",
+        "license_url": "https://creativecommons.org/licenses/by/4.0/",
         "commercial_use_allowed": True,
         "redistribution_allowed": True,
         "derivative_use_allowed": True,
@@ -35,17 +39,24 @@ def test_unknown_license_is_rejected() -> None:
         _candidate(license_name="unknown")
 
 
-def test_non_commercial_license_is_research_eval_only() -> None:
+def test_missing_license_url_needs_review() -> None:
+    decision = evaluate_candidate(_candidate(license_url=None))
+
+    assert decision.status == AcceptanceStatus.NEEDS_REVIEW
+    assert decision.effective_use is None
+
+
+def test_non_commercial_license_is_eval_only_by_default() -> None:
     decision = evaluate_candidate(
         _candidate(
             license_name="CC-BY-NC-4.0",
+            license_url="https://creativecommons.org/licenses/by-nc/4.0/",
             commercial_use_allowed=False,
-            intended_use="training",
         )
     )
 
-    assert decision.status == AcceptanceStatus.RESEARCH_EVAL_ONLY
-    assert decision.effective_use == "research_eval"
+    assert decision.status == AcceptanceStatus.EVAL_ONLY
+    assert decision.effective_use == "eval_only"
 
 
 def test_ambiguous_license_is_rejected_by_acceptance_gate() -> None:
@@ -69,10 +80,29 @@ def test_high_pii_is_allowed_when_redacted() -> None:
     assert decision.status == AcceptanceStatus.APPROVED
 
 
-def test_cloud_hosted_metadata_discovery_is_allowed() -> None:
-    candidate = _candidate(cloud_hosted=True, metadata_only=True)
-    decision = evaluate_candidate(candidate)
+def test_user_opt_in_redacted_exception_allows_financial_training() -> None:
+    decision = evaluate_candidate(
+        _candidate(
+            dataset_id="user_opt_in_redacted:sample",
+            source_catalog="user_opt_in_redacted",
+            modality="document_image",
+            candidate_tasks=["bank_statement_extraction"],
+            redacted=True,
+            explicit_user_opt_in=True,
+        )
+    )
 
-    assert candidate.cloud_hosted is True
-    assert candidate.metadata_only is True
     assert decision.status == AcceptanceStatus.APPROVED
+
+
+def test_sensitive_real_financial_documents_are_blocked_without_redaction() -> None:
+    decision = evaluate_candidate(
+        _candidate(
+            modality="document_image",
+            candidate_tasks=["invoice_extraction"],
+            pii_risk="medium",
+            contains_sensitive_data=True,
+        )
+    )
+
+    assert decision.status == AcceptanceStatus.REJECTED

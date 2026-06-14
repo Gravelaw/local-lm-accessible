@@ -80,17 +80,19 @@ class TranscriptionResponse(BaseModel):
     unsupported_language: bool
     warnings: list[str] = Field(default_factory=list)
     status: Literal["stub", "ok"]
+    artifact_ready: bool = False
     model_ready: bool = False
 
 
 @app.get("/health")
 def health() -> dict[str, object]:
-    model_ready, model_warning = _model_ready()
+    artifact_ready, model_ready, model_warning = _model_ready()
     return {
-        "status": "ok" if model_ready else "model_missing",
+        "status": "ok" if model_ready else "runtime_unavailable",
         "local_only": True,
         "service": "parakeet",
         "model": "nvidia/parakeet-tdt-0.6b-v3",
+        "artifact_ready": artifact_ready,
         "model_ready": model_ready,
         "warnings": [] if model_warning is None else [model_warning],
     }
@@ -103,7 +105,8 @@ def transcribe(request: TranscriptionRequest) -> TranscriptionResponse:
         raise HTTPException(status_code=400, detail="audio_filepath must point to a local file")
 
     model_path, model_warning = _verified_asr_model_path()
-    model_ready = model_path is not None
+    artifact_ready = model_path is not None
+    model_ready = False
     unsupported_language = request.language.lower() not in SUPPORTED_LANGUAGES
     experimental = unsupported_language or (
         request.region.lower() in EXPERIMENTAL_REGIONS and request.language.lower() != "en"
@@ -115,7 +118,7 @@ def transcribe(request: TranscriptionRequest) -> TranscriptionResponse:
         warnings.append(
             "Language/region combination is experimental until local eval proves usable."
         )
-    if not model_ready and model_warning is not None:
+    if not artifact_ready and model_warning is not None:
         warnings.append(model_warning)
     status: Literal["stub", "ok"] = "stub"
     text = f"LOCAL_STUB_TRANSCRIPTION_FOR:{path.name}"
@@ -123,6 +126,7 @@ def transcribe(request: TranscriptionRequest) -> TranscriptionResponse:
         try:
             text = _transcribe_with_verified_model(path, model_path)
             status = "ok"
+            model_ready = True
         except RuntimeError as exc:
             warnings.append(str(exc))
     return TranscriptionResponse(
@@ -134,13 +138,30 @@ def transcribe(request: TranscriptionRequest) -> TranscriptionResponse:
         unsupported_language=unsupported_language,
         warnings=warnings,
         status=status,
+        artifact_ready=artifact_ready,
         model_ready=model_ready,
     )
 
 
-def _model_ready() -> tuple[bool, str | None]:
+def _model_ready() -> tuple[bool, bool, str | None]:
     model_path, warning = _verified_asr_model_path()
-    return model_path is not None, warning
+    if model_path is None:
+        return False, False, warning
+    runtime_warning = _asr_runtime_warning()
+    if runtime_warning is not None:
+        return True, False, runtime_warning
+    return True, True, None
+
+
+def _asr_runtime_warning() -> str | None:
+    try:
+        import transformers  # noqa: F401
+    except ImportError:
+        return (
+            "Transformers ASR runtime is not installed; install training/runtime extras "
+            "to run Parakeet locally."
+        )
+    return None
 
 
 def _verified_asr_model_path() -> tuple[Path | None, str | None]:
