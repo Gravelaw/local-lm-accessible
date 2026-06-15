@@ -52,6 +52,8 @@ def test_modal_workflow_uses_image_volumes_and_secrets() -> None:
     assert "scripts/check_asr_contingency.py" in source
     assert "scripts/check_finetuning_completion.py" in source
     assert "check_finetuning_completion" in source
+    assert "evaluate_asr_tiny" in source
+    assert "training/asr/eval_wer.py" in source
     assert "llama_nemotron_nano_modal_lora.yaml" in source
     assert "nemotron_modal_prepared_lora.yaml" in source
     assert "minicpm_v_modal_document_lora.yaml" in source

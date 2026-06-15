@@ -44,14 +44,16 @@ def check_finetuning_completion(
         smoke_report=smoke_report,
     )
     report = {
-        "complete": text["complete"] and _json_exists(vision_report) and _json_exists(asr_report),
+        "complete": text["complete"]
+        and _json_exists(vision_report)
+        and _asr_contingency_complete(asr_report),
         "text_finetuning": text,
         "vision_readiness": {
             "complete": _json_exists(vision_report),
             "report": str(vision_report),
         },
         "asr_contingency": {
-            "complete": _json_exists(asr_report),
+            "complete": _asr_contingency_complete(asr_report),
             "report": str(asr_report),
         },
         "next_modal_actions": _next_modal_actions(text, vision_report, asr_report),
@@ -134,6 +136,17 @@ def _read_json_if_exists(path: Path) -> dict[str, Any]:
     return payload
 
 
+def _asr_contingency_complete(path: Path) -> bool:
+    report = _read_json_if_exists(path)
+    if not report:
+        return False
+    return (
+        report.get("alternate_required") is False
+        and report.get("status") == "keep_primary_with_runtime_validation"
+        and isinstance(report.get("eval_metrics"), dict)
+    )
+
+
 def _next_modal_actions(
     text: dict[str, Any],
     vision_report: Path,
@@ -158,7 +171,8 @@ def _next_modal_actions(
         actions.append(
             "modal run modal_workflows/local_lm_pipeline.py --action create_vision_readiness"
         )
-    if not _json_exists(asr_report):
+    if not _asr_contingency_complete(asr_report):
+        actions.append("modal run modal_workflows/local_lm_pipeline.py --action evaluate_asr_tiny")
         actions.append(
             "modal run modal_workflows/local_lm_pipeline.py --action check_asr_contingency"
         )

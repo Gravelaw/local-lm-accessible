@@ -49,6 +49,8 @@ VISION_READINESS_JSON = REPORTS_DIR / "vision_readiness.json"
 VISION_READINESS_MD = REPORTS_DIR / "vision_readiness.md"
 ASR_CONTINGENCY_JSON = REPORTS_DIR / "asr_contingency.json"
 ASR_CONTINGENCY_MD = REPORTS_DIR / "asr_contingency.md"
+ASR_EVAL_JSON = REPORTS_DIR / "asr_eval.json"
+ASR_EVAL_MD = REPORTS_DIR / "asr_eval.md"
 FINETUNING_COMPLETION_JSON = REPORTS_DIR / "finetuning_completion.json"
 FINETUNING_COMPLETION_MD = REPORTS_DIR / "finetuning_completion.md"
 
@@ -1051,6 +1053,31 @@ def create_vision_readiness(dry_run: bool = True, limit: int = 6) -> dict[str, A
     timeout=60 * 5,
     retries=1,
 )
+def evaluate_asr_tiny() -> dict[str, Any]:
+    result = _run(
+        [
+            "python",
+            "training/asr/eval_wer.py",
+            "--manifest",
+            str(REMOTE_ROOT / "training" / "asr" / "sample_data" / "tiny_manifest.jsonl"),
+            "--predictions",
+            str(REMOTE_ROOT / "training" / "asr" / "sample_data" / "tiny_predictions.json"),
+            "--report-json",
+            str(ASR_EVAL_JSON),
+            "--report-md",
+            str(ASR_EVAL_MD),
+        ]
+    )
+    _commit_volumes()
+    return result
+
+
+@app.function(
+    image=data_image,
+    volumes={str(VOLUME_ROOT): DATA_VOLUME, "/cache": CACHE_VOLUME},
+    timeout=60 * 5,
+    retries=1,
+)
 def check_asr_contingency() -> dict[str, Any]:
     result = _run(
         [
@@ -1059,7 +1086,7 @@ def check_asr_contingency() -> dict[str, Any]:
             "--manifest",
             str(REMOTE_ROOT / "models" / "manifest.json"),
             "--eval-report",
-            str(REPORTS_DIR / "asr_eval.json"),
+            str(ASR_EVAL_JSON),
             "--report-json",
             str(ASR_CONTINGENCY_JSON),
             "--report-md",
@@ -1254,6 +1281,8 @@ def main(
         result = create_vision_readiness.remote(dry_run=dry_run)
     elif action == "check_asr_contingency":
         result = check_asr_contingency.remote()
+    elif action == "evaluate_asr_tiny":
+        result = evaluate_asr_tiny.remote()
     elif action == "check_finetuning_completion":
         result = check_finetuning_completion.remote()
     elif action == "publish_hf_models":

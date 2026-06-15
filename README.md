@@ -297,6 +297,7 @@ Run fine-tuning dry runs on Modal GPU compute:
 .venv/bin/modal run modal_workflows/local_lm_pipeline.py --action finetune_text --dry-run
 .venv/bin/modal run modal_workflows/local_lm_pipeline.py --action finetune_vision --dry-run
 .venv/bin/modal run modal_workflows/local_lm_pipeline.py --action create_vision_readiness
+.venv/bin/modal run modal_workflows/local_lm_pipeline.py --action evaluate_asr_tiny
 .venv/bin/modal run modal_workflows/local_lm_pipeline.py --action check_asr_contingency
 ```
 
@@ -341,10 +342,13 @@ contingency reports are all present.
 
 Vision readiness writes `vision_readiness.*` and validates the OpenBMB
 MiniCPM-V LoRA/QLoRA command plan without downloading or training on images
-unless `--require-images` is explicitly used by the underlying script. ASR
-contingency writes `asr_contingency.*`; alternate ASR candidates are restricted
-to NVIDIA families, must be verified locally, and stay eval-only until WER and
-unsupported-language checks pass.
+unless `--require-images` is explicitly used by the underlying script.
+`evaluate_asr_tiny` writes `asr_eval.*` from the checked-in tiny ASR manifest,
+and ASR contingency writes `asr_contingency.*`. Alternate ASR candidates are
+restricted to NVIDIA families, must be verified locally, and stay eval-only
+until WER and unsupported-language checks pass. The completion gate requires the
+ASR contingency report to keep Parakeet primary with eval metrics; a report that
+says `evaluate_alternate` is not considered complete.
 
 The Modal app copies source code into `/workspace/local-lm`, stores data and
 reports on the `local-lm-data` volume under `/vol/local-lm`, and uses
