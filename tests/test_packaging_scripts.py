@@ -13,8 +13,10 @@ import yaml
 
 from scripts.download_models import build_download_plan, build_hf_download_command, download_model
 from scripts.model_launch_info import launch_info
+from scripts.publish_hf_artifacts import build_publish_plan
 from scripts.release_gate import run_release_gate
 from scripts.smoke_test_local import run_smoke
+from scripts.update_text_model_release_manifest import update_text_model_release_manifest
 from scripts.verify_model_checksums import (
     compute_model_artifact_checksums,
     load_manifest,
@@ -134,6 +136,76 @@ def test_download_model_invokes_hf_download_when_explicitly_allowed(
     assert command[0:3] == ["hf", "download", "nvidia/parakeet-tdt-0.6b-v3"]
     assert captured["command"] == command
     assert captured["check"] is True
+
+
+def test_hf_publish_plan_requires_build_small_namespace(tmp_path: Path) -> None:
+    artifact_dir = tmp_path / "artifact"
+    artifact_dir.mkdir()
+
+    with pytest.raises(ValueError, match="namespace must be build-small-hackathon"):
+        build_publish_plan(repo_id="Gravelaw/local-lm-accessible", local_path=artifact_dir)
+
+    plan = build_publish_plan(
+        repo_id="build-small-hackathon/local-lm-accessible-gguf",
+        local_path=artifact_dir,
+    )
+
+    assert plan["repo_id"] == "build-small-hackathon/local-lm-accessible-gguf"
+    assert plan["commands"][0][:4] == [
+        "hf",
+        "repos",
+        "create",
+        "build-small-hackathon/local-lm-accessible-gguf",
+    ]
+
+    upload_only_plan = build_publish_plan(
+        repo_id="build-small-hackathon/local-lm-accessible-gguf",
+        local_path=artifact_dir,
+        skip_create=True,
+    )
+    assert upload_only_plan["skip_create"] is True
+    assert upload_only_plan["commands"][0][:3] == [
+        "hf",
+        "upload-large-folder",
+        "build-small-hackathon/local-lm-accessible-gguf",
+    ]
+
+
+def test_update_text_model_release_manifest_updates_config_and_checksum(tmp_path: Path) -> None:
+    gguf = tmp_path / "local-lm-accessible-text-Q4_K_M.gguf"
+    gguf.write_bytes(b"gguf")
+    manifest = load_manifest()
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    config_path = tmp_path / "models.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "runtime": {"local_only": True},
+                "model_policy": {"max_v1_total_parameters_b": 32},
+                "models": {"text": {"enabled": True}},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = update_text_model_release_manifest(
+        gguf_path=gguf,
+        model_id="build-small-hackathon/local-lm-accessible-gguf",
+        model_name="local-lm accessible text",
+        quantization="Q4_K_M",
+        output_manifest=manifest_path,
+        models_config=config_path,
+        root=tmp_path,
+    )
+    updated_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    text_model = next(model for model in updated_manifest["models"] if model["key"] == "text")
+    updated_config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+
+    assert result["sha256"] == sha256_path(gguf)
+    assert text_model["sha256"] == sha256_path(gguf)
+    assert text_model["model_id"] == "build-small-hackathon/local-lm-accessible-gguf"
+    assert updated_config["models"]["text"]["parameters_b"] == 8
 
 
 def test_checksum_verification_fails_closed_when_sha_missing() -> None:

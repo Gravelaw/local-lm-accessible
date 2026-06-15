@@ -10,12 +10,16 @@ def model_load_kwargs(
     *,
     local_files_only: bool = True,
     trust_remote_code: bool = False,
+    torch_dtype: object | None = None,
 ) -> dict[str, Any]:
-    return {
+    kwargs = {
         "device_map": "auto",
         "trust_remote_code": trust_remote_code,
         "local_files_only": local_files_only,
     }
+    if torch_dtype is not None:
+        kwargs["torch_dtype"] = torch_dtype
+    return kwargs
 
 
 def tokenizer_load_kwargs(
@@ -37,6 +41,7 @@ def merge_adapter(
     *,
     local_files_only: bool = True,
     trust_remote_code: bool = False,
+    dtype: str = "auto",
 ) -> None:
     if not adapter_dir.exists():
         raise FileNotFoundError(f"missing adapter directory: {adapter_dir}")
@@ -49,11 +54,14 @@ def merge_adapter(
     from peft import PeftModel
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
+    torch_dtype = _torch_dtype(dtype)
+
     model = AutoModelForCausalLM.from_pretrained(
         base_model,
         **model_load_kwargs(
             local_files_only=local_files_only,
             trust_remote_code=trust_remote_code,
+            torch_dtype=torch_dtype,
         ),
     )
     tokenizer = AutoTokenizer.from_pretrained(
@@ -89,6 +97,12 @@ def main() -> None:
         action="store_true",
         help="Allow model repository code execution. Disabled by default.",
     )
+    parser.add_argument(
+        "--dtype",
+        choices=("auto", "bfloat16", "float16", "float32"),
+        default="auto",
+        help="Torch dtype for loading the base model before merging.",
+    )
     args = parser.parse_args()
     merge_adapter(
         args.base_model,
@@ -96,7 +110,22 @@ def main() -> None:
         args.output_dir,
         local_files_only=not args.allow_remote_files,
         trust_remote_code=args.trust_remote_code,
+        dtype=args.dtype,
     )
+
+
+def _torch_dtype(dtype: str) -> object | None:
+    if dtype == "auto":
+        return None
+    import torch
+
+    if dtype == "bfloat16":
+        return torch.bfloat16
+    if dtype == "float16":
+        return torch.float16
+    if dtype == "float32":
+        return torch.float32
+    raise ValueError(f"unsupported dtype: {dtype}")
 
 
 if __name__ == "__main__":

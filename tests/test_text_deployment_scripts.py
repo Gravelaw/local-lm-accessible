@@ -111,3 +111,31 @@ def test_quantize_gguf_writes_checksum_sidecars(tmp_path: Path) -> None:
     assert (output_dir / "nemotron-router-summary-Q5_K_M.gguf").exists()
     assert (output_dir / "nemotron-router-summary-Q4_K_M.gguf.sha256").exists()
     assert (output_dir / "nemotron-router-summary-Q5_K_M.gguf.sha256").exists()
+
+
+def test_quantize_gguf_supports_model_basename_override(tmp_path: Path) -> None:
+    input_gguf = tmp_path / "input.gguf"
+    input_gguf.write_bytes(b"f16 gguf")
+    fake_quantize = tmp_path / "llama-quantize"
+    fake_quantize.write_text(
+        '#!/usr/bin/env bash\nset -euo pipefail\ncp "$1" "$2"\n',
+        encoding="utf-8",
+    )
+    fake_quantize.chmod(0o755)
+    output_dir = tmp_path / "quantized"
+    env = os.environ.copy()
+    env["LLAMA_QUANTIZE"] = str(fake_quantize)
+    env["MODEL_BASENAME"] = "local-lm-accessible-text"
+
+    result = subprocess.run(
+        ["bash", "training/text/quantize_gguf.sh", str(input_gguf), str(output_dir)],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert (output_dir / "local-lm-accessible-text-Q4_K_M.gguf").exists()
+    assert (output_dir / "local-lm-accessible-text-Q5_K_M.gguf").exists()

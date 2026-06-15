@@ -34,7 +34,18 @@ def test_modal_workflow_uses_image_volumes_and_secrets() -> None:
     assert "scripts/check_text_adapter_release_readiness.py" in source
     assert "FINAL_TEXT_ADAPTER_READINESS_JSON" in source
     assert "plan_text_adapter_packaging" in source
+    assert "run_text_adapter_packaging" in source
+    assert "smoke_test_packaged_gguf" in source
+    assert "publish_hf_models" in source
+    assert "publish_skip_create" in source
+    assert "--skip-create" in source
+    assert "build-small-hackathon/local-lm-accessible-gguf" in source
+    assert "-DGGML_CUDA=ON" in source
+    assert "llama-cli" in source
+    assert "--n-gpu-layers" in source
+    assert "--single-turn" in source
     assert "scripts/create_text_adapter_packaging_plan.py" in source
+    assert "scripts/publish_hf_artifacts.py" in source
     assert "scripts/check_nemotron_dependencies.py" in source
     assert "scripts/preflight_finetuning_manifests.py" in source
     assert "llama_nemotron_nano_modal_lora.yaml" in source

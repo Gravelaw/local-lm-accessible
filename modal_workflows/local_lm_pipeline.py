@@ -130,6 +130,32 @@ training_dependencies_image = (
 
 training_image = _with_repo_files(training_dependencies_image)
 
+packaging_dependencies_image = (
+    training_dependencies_image
+    .apt_install("cmake")
+    .pip_install("numpy>=1.26", "protobuf>=4.25", "sentencepiece>=0.2")
+    .run_commands(
+        "git clone --depth 1 https://github.com/ggml-org/llama.cpp /opt/llama.cpp",
+        "ln -sf /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1",
+        (
+            "CUDACXX=/usr/local/cuda/bin/nvcc CUDAHOSTCXX=/usr/bin/g++ "
+            "cmake -S /opt/llama.cpp -B /opt/llama.cpp/build "
+            "-DLLAMA_CURL=OFF -DGGML_CUDA=ON "
+            "-DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc "
+            "-DCMAKE_CUDA_HOST_COMPILER=/usr/bin/g++ "
+            "-DCMAKE_CUDA_ARCHITECTURES=86 "
+            "-DCMAKE_EXE_LINKER_FLAGS='-L/usr/local/cuda/lib64/stubs "
+            "-Wl,-rpath-link,/usr/local/cuda/lib64/stubs' "
+            "-DCMAKE_SHARED_LINKER_FLAGS='-L/usr/local/cuda/lib64/stubs "
+            "-Wl,-rpath-link,/usr/local/cuda/lib64/stubs'"
+        ),
+        "cmake --build /opt/llama.cpp/build --target llama-cli -j2",
+        "cmake --build /opt/llama.cpp/build --target llama-quantize -j2",
+    )
+)
+
+packaging_image = _with_repo_files(packaging_dependencies_image)
+
 
 def _run(
     command: list[str],
@@ -278,6 +304,16 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def _sha256_file(path: Path) -> str:
+    import hashlib
+
+    digest = hashlib.sha256()
+    with path.open("rb") as item:
+        for chunk in iter(lambda: item.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def _read_training_config(config_path: Path) -> dict[str, Any]:
     import yaml
 
@@ -286,6 +322,73 @@ def _read_training_config(config_path: Path) -> dict[str, Any]:
     if not isinstance(config, dict):
         raise ValueError(f"training config must be a mapping: {config_path}")
     return config
+
+
+def _stage_adapter_publish_dir(adapter_dir: Path, publish_dir: Path, *, base_model: str) -> Path:
+    publish_dir.mkdir(parents=True, exist_ok=True)
+    for pattern in ("adapter_*", "tokenizer*", "special_tokens_map.json", "chat_template.jinja"):
+        for source in adapter_dir.glob(pattern):
+            if source.is_file():
+                shutil.copy2(source, publish_dir / source.name)
+    readme = publish_dir / "README.md"
+    readme.write_text(
+        "\n".join(
+            [
+                "---",
+                "license: other",
+                "base_model: " + base_model,
+                "library_name: peft",
+                "tags:",
+                "- build-small-hackathon",
+                "- local-lm",
+                "- accessibility",
+                "- llama-cpp",
+                "---",
+                "",
+                "# local-lm accessible text LoRA",
+                "",
+                "Fine-tuned LoRA adapter for local-lm accessible assistant workflows.",
+                "The base model is `nvidia/Llama-3.1-Nemotron-Nano-8B-v1`.",
+                "",
+                "This adapter was trained for local-first routing, summarization, JSON repair,",
+                "tool-call JSON, and uncertainty-warning behavior for accessibility-focused use.",
+                "",
+                "Use locally only. Do not upload user documents to remote inference services.",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return publish_dir
+
+
+def _stage_gguf_readme(gguf_dir: Path) -> None:
+    gguf_dir.mkdir(parents=True, exist_ok=True)
+    (gguf_dir / "README.md").write_text(
+        "\n".join(
+            [
+                "---",
+                "license: other",
+                "base_model: nvidia/Llama-3.1-Nemotron-Nano-8B-v1",
+                "tags:",
+                "- build-small-hackathon",
+                "- local-lm",
+                "- accessibility",
+                "- gguf",
+                "- llama-cpp",
+                "---",
+                "",
+                "# local-lm accessible GGUF",
+                "",
+                "GGUF exports for the local-lm accessible text model.",
+                "",
+                "Run with llama.cpp locally. The app is designed for local-first use and",
+                "does not require cloud inference at runtime.",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
 
 
 def _cuda_extension_build_env() -> dict[str, str]:
@@ -730,7 +833,7 @@ def evaluate_text_adapter() -> dict[str, Any]:
 
 
 @app.function(
-    image=training_image,
+    image=packaging_image,
     volumes={str(VOLUME_ROOT): DATA_VOLUME, "/cache": CACHE_VOLUME},
     secrets=[HF_SECRET],
     timeout=60 * 10,
@@ -764,6 +867,210 @@ def plan_text_adapter_packaging() -> dict[str, Any]:
     )
     _commit_volumes()
     return result
+
+
+@app.function(
+    image=packaging_image,
+    volumes={str(VOLUME_ROOT): DATA_VOLUME, "/cache": CACHE_VOLUME},
+    secrets=[HF_SECRET],
+    gpu="A10G",
+    timeout=60 * 60 * 8,
+    retries=0,
+)
+def run_text_adapter_packaging() -> dict[str, Any]:
+    config = _read_training_config(TEXT_MODAL_CONFIG)
+    adapter_dir = Path(str(config["training"]["output_dir"]))
+    base_model = str(config["model"]["base_model"])
+    merged_dir = VOLUME_ROOT / "training" / "text" / "llama_nemotron_nano_merged_hf"
+    f16_gguf = VOLUME_ROOT / "models" / "text" / "local-lm-accessible-text-f16.gguf"
+    quantized_dir = VOLUME_ROOT / "models" / "text"
+    q4_path = quantized_dir / "local-lm-accessible-text-Q4_K_M.gguf"
+    q5_path = quantized_dir / "local-lm-accessible-text-Q5_K_M.gguf"
+    llama_env = {
+        "LLAMA_CPP_DIR": "/opt/llama.cpp",
+        "LLAMA_CLI": "/opt/llama.cpp/build/bin/llama-cli",
+        "LLAMA_QUANTIZE": "/opt/llama.cpp/build/bin/llama-quantize",
+        "MODEL_BASENAME": "local-lm-accessible-text",
+        "PYTHONPATH": "/opt/llama.cpp/gguf-py",
+    }
+    readiness = _run(
+        [
+            "python",
+            "scripts/check_text_adapter_release_readiness.py",
+            "--adapter-dir",
+            str(adapter_dir),
+            "--eval-report",
+            str(FINAL_TEXT_ADAPTER_EVAL_JSON),
+            "--output-json",
+            str(FINAL_TEXT_ADAPTER_READINESS_JSON),
+            "--output-md",
+            str(FINAL_TEXT_ADAPTER_READINESS_MD),
+        ]
+    )
+    merge = _run(
+        [
+            "python",
+            "training/text/merge_adapter.py",
+            "--base-model",
+            base_model,
+            "--adapter-dir",
+            str(adapter_dir),
+            "--output-dir",
+            str(merged_dir),
+            "--allow-remote-files",
+            "--dtype",
+            "bfloat16",
+        ],
+        timeout_seconds=60 * 60 * 3,
+        stream_output=True,
+    )
+    export = _run(
+        [
+            "bash",
+            "training/text/export_gguf.sh",
+            str(merged_dir),
+            str(f16_gguf),
+        ],
+        extra_env=llama_env,
+        timeout_seconds=60 * 60 * 2,
+        stream_output=True,
+    )
+    quantize = _run(
+        [
+            "bash",
+            "training/text/quantize_gguf.sh",
+            str(f16_gguf),
+            str(quantized_dir),
+        ],
+        extra_env=llama_env,
+        timeout_seconds=60 * 60 * 3,
+        stream_output=True,
+    )
+    report = {
+        "base_model": base_model,
+        "adapter_dir": str(adapter_dir),
+        "merged_dir": str(merged_dir),
+        "f16_gguf": {"path": str(f16_gguf), "sha256": _sha256_file(f16_gguf)},
+        "q4_gguf": {"path": str(q4_path), "sha256": _sha256_file(q4_path)},
+        "q5_gguf": {"path": str(q5_path), "sha256": _sha256_file(q5_path)},
+        "readiness": readiness,
+        "merge": merge,
+        "export": export,
+        "quantize": quantize,
+    }
+    _write_json(REPORTS_DIR / "final_text_adapter_packaging_result.json", report)
+    _commit_volumes()
+    return report
+
+
+@app.function(
+    image=packaging_image,
+    volumes={str(VOLUME_ROOT): DATA_VOLUME, "/cache": CACHE_VOLUME},
+    secrets=[HF_SECRET],
+    gpu="A10G",
+    timeout=60 * 20,
+    retries=1,
+)
+def smoke_test_packaged_gguf() -> dict[str, Any]:
+    q4_path = VOLUME_ROOT / "models" / "text" / "local-lm-accessible-text-Q4_K_M.gguf"
+    command = [
+        "/opt/llama.cpp/build/bin/llama-cli",
+        "-m",
+        str(q4_path),
+        "-p",
+        "Return one short sentence explaining that local-lm runs locally.",
+        "-n",
+        "48",
+        "--ctx-size",
+        "2048",
+        "--temp",
+        "0.2",
+        "--top-p",
+        "0.9",
+        "--n-gpu-layers",
+        "99",
+        "--single-turn",
+        "--no-display-prompt",
+    ]
+    result = _run(
+        command,
+        timeout_seconds=60 * 10,
+        stream_output=True,
+    )
+    report = {
+        "model": str(q4_path),
+        "backend": "llama.cpp CUDA",
+        "command": command,
+        "result": result,
+        "passed": result["returncode"] == 0 and bool(str(result["stdout"]).strip()),
+    }
+    _write_json(REPORTS_DIR / "final_text_gguf_smoke.json", report)
+    _commit_volumes()
+    return report
+
+
+@app.function(
+    image=packaging_image,
+    volumes={str(VOLUME_ROOT): DATA_VOLUME, "/cache": CACHE_VOLUME},
+    secrets=[HF_SECRET],
+    timeout=60 * 60 * 4,
+    retries=1,
+)
+def publish_hf_models(
+    adapter_repo_id: str,
+    gguf_repo_id: str,
+    execute: bool = False,
+    private: bool = False,
+    skip_create: bool = False,
+) -> dict[str, Any]:
+    config = _read_training_config(TEXT_MODAL_CONFIG)
+    adapter_dir = Path(str(config["training"]["output_dir"]))
+    base_model = str(config["model"]["base_model"])
+    adapter_publish_dir = VOLUME_ROOT / "hf_publish" / "text_lora"
+    gguf_dir = VOLUME_ROOT / "models" / "text"
+    _stage_adapter_publish_dir(adapter_dir, adapter_publish_dir, base_model=base_model)
+    _stage_gguf_readme(gguf_dir)
+    adapter_command = [
+        "python",
+        "scripts/publish_hf_artifacts.py",
+        "--repo-id",
+        adapter_repo_id,
+        "--local-path",
+        str(adapter_publish_dir),
+        "--repo-type",
+        "model",
+        "--report-json",
+        str(REPORTS_DIR / "hf_publish_adapter.json"),
+        "--report-md",
+        str(REPORTS_DIR / "hf_publish_adapter.md"),
+    ]
+    gguf_command = [
+        "python",
+        "scripts/publish_hf_artifacts.py",
+        "--repo-id",
+        gguf_repo_id,
+        "--local-path",
+        str(gguf_dir),
+        "--repo-type",
+        "model",
+        "--report-json",
+        str(REPORTS_DIR / "hf_publish_gguf.json"),
+        "--report-md",
+        str(REPORTS_DIR / "hf_publish_gguf.md"),
+    ]
+    if execute:
+        adapter_command.append("--execute")
+        gguf_command.append("--execute")
+    if skip_create:
+        adapter_command.append("--skip-create")
+        gguf_command.append("--skip-create")
+    if private:
+        adapter_command.append("--private")
+        gguf_command.append("--private")
+    adapter = _run(adapter_command, timeout_seconds=60 * 60 * 2, stream_output=True)
+    gguf = _run(gguf_command, timeout_seconds=60 * 60 * 3, stream_output=True)
+    _commit_volumes()
+    return {"adapter": adapter, "gguf": gguf, "execute": execute}
 
 
 @app.function(
@@ -804,6 +1111,11 @@ def main(
     dry_run: bool = True,
     dependency_timeout_seconds: int = 60 * 45,
     install_mamba_dependencies: bool = False,
+    hf_adapter_repo_id: str = "build-small-hackathon/local-lm-accessible-text-lora",
+    hf_gguf_repo_id: str = "build-small-hackathon/local-lm-accessible-gguf",
+    publish_execute: bool = False,
+    publish_private: bool = False,
+    publish_skip_create: bool = False,
 ) -> None:
     if action == "ingest_data":
         result = ingest_data.remote(targets=targets, max_dataset_size_gb=max_dataset_size_gb)
@@ -834,6 +1146,18 @@ def main(
         result = evaluate_text_adapter.remote()
     elif action == "plan_text_adapter_packaging":
         result = plan_text_adapter_packaging.remote()
+    elif action == "run_text_adapter_packaging":
+        result = run_text_adapter_packaging.remote()
+    elif action == "smoke_test_packaged_gguf":
+        result = smoke_test_packaged_gguf.remote()
+    elif action == "publish_hf_models":
+        result = publish_hf_models.remote(
+            adapter_repo_id=hf_adapter_repo_id,
+            gguf_repo_id=hf_gguf_repo_id,
+            execute=publish_execute,
+            private=publish_private,
+            skip_create=publish_skip_create,
+        )
     else:
         raise ValueError(f"unsupported action: {action}")
     print(json.dumps(result, indent=2, sort_keys=True))

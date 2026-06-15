@@ -94,6 +94,19 @@ For a quick local smoke test that does not require model weights:
 python3 scripts/smoke_test_local.py --mock-model-endpoints
 ```
 
+## Fine-Tuning, Packaging, And Hosted Space Files
+
+The Modal fine-tuning, GGUF packaging, Hugging Face model publish, and public
+Gradio Space upload steps are documented in
+`docs/hf_space_and_model_ops.md`.
+
+The standalone hosted Space bundle lives in `spaces/local_lm_accessible/`.
+Build the upload directory with:
+
+```bash
+.venv/bin/python scripts/prepare_hf_space_bundle.py
+```
+
 That smoke test starts loopback-only mock llama.cpp-compatible `/completion`
 servers for text and vision, then confirms the gateway uses local HTTP model
 clients for Ask, Read, and image tasks without cloud calls. It also writes a
