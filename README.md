@@ -12,6 +12,9 @@ python_version: "3.11"
 
 Hackathon track: Hugging Face Build Small Hackathon, Backyard AI. The app is built as a Gradio Space, keeps total deployed model parameters below 32B, and is designed to continue working offline after model download except for explicitly enabled optional web fetch.
 
+Official hackathon Space:
+https://build-small-hackathon-local-lm-accessible-for-elders.hf.space
+
 ## v1 Architecture
 
 - `services/gateway/`: FastAPI local gateway, request schemas, local route selection, tool registry, and local model client definitions.

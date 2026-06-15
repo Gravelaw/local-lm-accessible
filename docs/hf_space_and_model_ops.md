@@ -4,6 +4,12 @@ This runbook covers the files and commands needed to finish text model
 fine-tuning, package the model, smoke-test llama.cpp, publish Hugging Face model
 artifacts, and host the public Gradio Space.
 
+Official Space:
+
+- `build-small-hackathon/Local-lm-accessible-for-elders`
+- https://build-small-hackathon-local-lm-accessible-for-elders.hf.space
+- Runtime: Hugging Face ZeroGPU Gradio Space with `/data` bucket mount.
+
 ## Modal Fine-Tuning And Packaging
 
 Run from the repository root.
@@ -106,11 +112,24 @@ hf upload build-small-hackathon/local-lm-accessible \
   --commit-message "Publish local-lm accessible Gradio Space"
 ```
 
+The current official Space already exists, so the expected command is:
+
+```bash
+hf upload build-small-hackathon/Local-lm-accessible-for-elders \
+  dist/hf_space_local_lm_accessible \
+  --type space \
+  --commit-message "Publish local-lm accessible Gradio Space"
+```
+
 If the create command returns `403`, ask an organization admin to create the
 Gradio Space first, then run only the `hf upload` command.
 
 The hosted Space is public-demo only. It must not ask users to upload private
 documents. Private documents belong in laptop-local GGUF mode.
+
+ZeroGPU callbacks should use `@spaces.GPU` for GPU-routed work. Keep a safe
+fallback path so the Space still starts if optional model artifacts or model
+repos are not available at submission time.
 
 ## Release Gate
 

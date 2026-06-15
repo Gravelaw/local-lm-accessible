@@ -51,5 +51,5 @@ def test_prepare_hf_space_bundle_copies_upload_files(tmp_path: Path) -> None:
         "hf",
         "repos",
         "create",
-        "build-small-hackathon/local-lm-accessible",
+        "build-small-hackathon/Local-lm-accessible-for-elders",
     ]

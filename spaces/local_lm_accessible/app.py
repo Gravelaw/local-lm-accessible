@@ -9,7 +9,24 @@ from typing import Any
 
 import gradio as gr
 
-APP_TITLE = "local-lm accessible"
+APP_TITLE = "Local LM Accessible For Elders"
+OFFICIAL_SPACE_ID = "build-small-hackathon/Local-lm-accessible-for-elders"
+OFFICIAL_SPACE_URL = "https://build-small-hackathon-local-lm-accessible-for-elders.hf.space"
+try:
+    import spaces
+except ImportError:
+    class _SpacesShim:
+        @staticmethod
+        def GPU(*args: Any, **kwargs: Any) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+            if args and callable(args[0]) and not kwargs:
+                return args[0]
+
+            def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+                return func
+
+            return decorator
+
+    spaces = _SpacesShim()
 SENSITIVE_TERMS = {
     "bank",
     "credit",
@@ -27,6 +44,7 @@ SENSITIVE_TERMS = {
 }
 TASK_CHOICES = (
     "Auto",
+    "zerogpu_assistant",
     "summarization",
     "json_repair",
     "receipt_or_invoice_json",
@@ -166,8 +184,36 @@ def route_tool(text: str) -> DemoResult:
     return DemoResult(f"Selected route: `{route}`", payload)
 
 
+@spaces.GPU(duration=45)
+def zerogpu_assistant(text: str) -> DemoResult:
+    if not text.strip():
+        return DemoResult("Type a request first.", {})
+    route = _auto_task(text)
+    if route == "json_repair":
+        return repair_json(text)
+    if route == "receipt_or_invoice_json":
+        return extract_document_json(text)
+    if route == "tool_routing":
+        return route_tool(text)
+    result = summarize_text(text)
+    payload = dict(result.payload)
+    payload["task"] = "zerogpu_assistant"
+    payload["status"] = "zerogpu_callback_fallback"
+    payload["zerogpu"] = {
+        "enabled": True,
+        "decorator": "@spaces.GPU(duration=45)",
+        "model_runtime": "pending published model artifacts",
+        "note": (
+            "Callback is GPU-routable on ZeroGPU and uses safe fallback logic "
+            "until model weights are available."
+        ),
+    }
+    return DemoResult(result.text, payload)
+
+
 def run_demo(task: str, user_text: str) -> tuple[str, dict[str, Any]]:
     handlers: dict[str, Callable[[str], DemoResult]] = {
+        "zerogpu_assistant": zerogpu_assistant,
         "summarization": summarize_text,
         "json_repair": repair_json,
         "receipt_or_invoice_json": extract_document_json,
@@ -181,9 +227,14 @@ def run_demo(task: str, user_text: str) -> tuple[str, dict[str, Any]]:
 def space_status() -> tuple[str, dict[str, Any]]:
     payload = {
         "space": APP_TITLE,
+        "space_id": OFFICIAL_SPACE_ID,
+        "space_url": OFFICIAL_SPACE_URL,
         "generated_at": _now(),
         "hosted_demo": True,
         "local_first_target": True,
+        "space_hardware": "ZeroGPU",
+        "space_mount": "/data",
+        "zerogpu_callbacks": ["zerogpu_assistant"],
         "external_model_apis": False,
         "hosted_ocr": False,
         "remote_telemetry": False,
@@ -196,11 +247,18 @@ def space_status() -> tuple[str, dict[str, Any]]:
         "model_artifacts": {
             "adapter_repo": "build-small-hackathon/local-lm-accessible-text-lora",
             "gguf_repo": "build-small-hackathon/local-lm-accessible-gguf",
+            "status": "pending organization model repository creation",
+        },
+        "modal_evidence": {
+            "text_lora_trained": True,
+            "gguf_q4_smoke_tested": True,
+            "runtime": "llama.cpp CUDA smoke on Modal",
         },
     }
     text = (
-        "Runtime: hosted Gradio demo. External model APIs: disabled. "
-        "Hosted OCR: disabled. Private document use: local GGUF mode only."
+        "Runtime: hosted Gradio demo on Hugging Face ZeroGPU. External model "
+        "APIs: disabled. Hosted OCR: disabled. Private document use: local "
+        "GGUF mode only."
     )
     return text, payload
 
@@ -263,7 +321,7 @@ def _format_answer(answer: str, payload: dict[str, Any]) -> str:
 with gr.Blocks(title=APP_TITLE, css=CSS) as demo:
     gr.Markdown(
         """
-# local-lm accessible
+# Local LM Accessible For Elders
 
 Hosted demo. Do not enter private documents. Use the published GGUF locally for
 private work.

@@ -9,6 +9,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 SPACE_SOURCE = ROOT / "spaces" / "local_lm_accessible"
 DEFAULT_OUTPUT = ROOT / "dist" / "hf_space_local_lm_accessible"
+DEFAULT_SPACE_ID = "build-small-hackathon/Local-lm-accessible-for-elders"
 REQUIRED_FILES = ("README.md", "app.py", "requirements.txt")
 
 
@@ -16,6 +17,7 @@ def prepare_space_bundle(
     *,
     source: Path = SPACE_SOURCE,
     output: Path = DEFAULT_OUTPUT,
+    space_id: str = DEFAULT_SPACE_ID,
     clean: bool = True,
 ) -> dict[str, Any]:
     if not source.exists():
@@ -41,7 +43,7 @@ def prepare_space_bundle(
                 "hf",
                 "repos",
                 "create",
-                "build-small-hackathon/local-lm-accessible",
+                space_id,
                 "--type",
                 "space",
                 "--space-sdk",
@@ -51,7 +53,7 @@ def prepare_space_bundle(
             [
                 "hf",
                 "upload",
-                "build-small-hackathon/local-lm-accessible",
+                space_id,
                 _display_path(output),
                 "--type",
                 "space",
@@ -71,9 +73,15 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--source", type=Path, default=SPACE_SOURCE)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument("--space-id", default=DEFAULT_SPACE_ID)
     parser.add_argument("--no-clean", action="store_true")
     args = parser.parse_args()
-    result = prepare_space_bundle(source=args.source, output=args.output, clean=not args.no_clean)
+    result = prepare_space_bundle(
+        source=args.source,
+        output=args.output,
+        space_id=args.space_id,
+        clean=not args.no_clean,
+    )
     print(json.dumps(result, indent=2, sort_keys=True))
 
 
