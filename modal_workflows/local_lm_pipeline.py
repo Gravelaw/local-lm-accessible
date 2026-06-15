@@ -45,6 +45,12 @@ FINAL_TEXT_ADAPTER_PACKAGING_PLAN_JSON = REPORTS_DIR / "final_text_adapter_packa
 FINAL_TEXT_ADAPTER_PACKAGING_PLAN_MD = REPORTS_DIR / "final_text_adapter_packaging_plan.md"
 FINAL_FINE_TUNING_SUMMARY_JSON = REPORTS_DIR / "final_finetuning_summary.json"
 FINAL_FINE_TUNING_SUMMARY_MD = REPORTS_DIR / "final_finetuning_summary.md"
+VISION_READINESS_JSON = REPORTS_DIR / "vision_readiness.json"
+VISION_READINESS_MD = REPORTS_DIR / "vision_readiness.md"
+ASR_CONTINGENCY_JSON = REPORTS_DIR / "asr_contingency.json"
+ASR_CONTINGENCY_MD = REPORTS_DIR / "asr_contingency.md"
+FINETUNING_COMPLETION_JSON = REPORTS_DIR / "finetuning_completion.json"
+FINETUNING_COMPLETION_MD = REPORTS_DIR / "finetuning_completion.md"
 
 DATA_VOLUME = modal.Volume.from_name("local-lm-data", create_if_missing=True)
 CACHE_VOLUME = modal.Volume.from_name("local-lm-cache", create_if_missing=True)
@@ -110,6 +116,10 @@ def _with_repo_files(image: modal.Image) -> modal.Image:
         .add_local_dir("scripts", remote_path=str(REMOTE_ROOT / "scripts"))
         .add_local_dir("services", remote_path=str(REMOTE_ROOT / "services"))
         .add_local_dir("training", remote_path=str(REMOTE_ROOT / "training"))
+        .add_local_file(
+            "models/manifest.json",
+            remote_path=str(REMOTE_ROOT / "models" / "manifest.json"),
+        )
     )
 
 
@@ -1010,6 +1020,96 @@ def smoke_test_packaged_gguf() -> dict[str, Any]:
 
 
 @app.function(
+    image=training_image,
+    volumes={str(VOLUME_ROOT): DATA_VOLUME, "/cache": CACHE_VOLUME},
+    timeout=60 * 10,
+    retries=1,
+)
+def create_vision_readiness(dry_run: bool = True, limit: int = 6) -> dict[str, Any]:
+    command = [
+        "python",
+        "scripts/create_vision_readiness_report.py",
+        "--config",
+        str(VISION_MODAL_CONFIG),
+        "--report-json",
+        str(VISION_READINESS_JSON),
+        "--report-md",
+        str(VISION_READINESS_MD),
+        "--limit",
+        str(limit),
+    ]
+    if not dry_run:
+        command.append("--require-images")
+    result = _run(command)
+    _commit_volumes()
+    return result
+
+
+@app.function(
+    image=data_image,
+    volumes={str(VOLUME_ROOT): DATA_VOLUME, "/cache": CACHE_VOLUME},
+    timeout=60 * 5,
+    retries=1,
+)
+def check_asr_contingency() -> dict[str, Any]:
+    result = _run(
+        [
+            "python",
+            "scripts/check_asr_contingency.py",
+            "--manifest",
+            str(REMOTE_ROOT / "models" / "manifest.json"),
+            "--eval-report",
+            str(REPORTS_DIR / "asr_eval.json"),
+            "--report-json",
+            str(ASR_CONTINGENCY_JSON),
+            "--report-md",
+            str(ASR_CONTINGENCY_MD),
+        ]
+    )
+    _commit_volumes()
+    return result
+
+
+@app.function(
+    image=data_image,
+    volumes={str(VOLUME_ROOT): DATA_VOLUME, "/cache": CACHE_VOLUME},
+    timeout=60 * 5,
+    retries=1,
+)
+def check_finetuning_completion() -> dict[str, Any]:
+    config = _read_training_config(TEXT_MODAL_CONFIG)
+    adapter_dir = Path(str(config["training"]["output_dir"]))
+    result = _run(
+        [
+            "python",
+            "scripts/check_finetuning_completion.py",
+            "--adapter-dir",
+            str(adapter_dir),
+            "--finalization-report",
+            str(FINAL_FINE_TUNING_SUMMARY_JSON),
+            "--eval-report",
+            str(FINAL_TEXT_ADAPTER_EVAL_JSON),
+            "--readiness-report",
+            str(FINAL_TEXT_ADAPTER_READINESS_JSON),
+            "--packaging-report",
+            str(REPORTS_DIR / "final_text_adapter_packaging_result.json"),
+            "--smoke-report",
+            str(REPORTS_DIR / "final_text_gguf_smoke.json"),
+            "--vision-report",
+            str(VISION_READINESS_JSON),
+            "--asr-report",
+            str(ASR_CONTINGENCY_JSON),
+            "--report-json",
+            str(FINETUNING_COMPLETION_JSON),
+            "--report-md",
+            str(FINETUNING_COMPLETION_MD),
+        ]
+    )
+    _commit_volumes()
+    return result
+
+
+@app.function(
     image=packaging_image,
     volumes={str(VOLUME_ROOT): DATA_VOLUME, "/cache": CACHE_VOLUME},
     secrets=[HF_SECRET],
@@ -1150,6 +1250,12 @@ def main(
         result = run_text_adapter_packaging.remote()
     elif action == "smoke_test_packaged_gguf":
         result = smoke_test_packaged_gguf.remote()
+    elif action == "create_vision_readiness":
+        result = create_vision_readiness.remote(dry_run=dry_run)
+    elif action == "check_asr_contingency":
+        result = check_asr_contingency.remote()
+    elif action == "check_finetuning_completion":
+        result = check_finetuning_completion.remote()
     elif action == "publish_hf_models":
         result = publish_hf_models.remote(
             adapter_repo_id=hf_adapter_repo_id,

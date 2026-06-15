@@ -296,6 +296,8 @@ Run fine-tuning dry runs on Modal GPU compute:
 ```bash
 .venv/bin/modal run modal_workflows/local_lm_pipeline.py --action finetune_text --dry-run
 .venv/bin/modal run modal_workflows/local_lm_pipeline.py --action finetune_vision --dry-run
+.venv/bin/modal run modal_workflows/local_lm_pipeline.py --action create_vision_readiness
+.venv/bin/modal run modal_workflows/local_lm_pipeline.py --action check_asr_contingency
 ```
 
 The default text fine-tuning backend is Hugging Face TRL `SFTTrainer` with PEFT
@@ -319,6 +321,9 @@ pass:
 .venv/bin/modal run modal_workflows/local_lm_pipeline.py --action finetune_text --no-dry-run
 .venv/bin/modal run modal_workflows/local_lm_pipeline.py --action evaluate_text_adapter
 .venv/bin/modal run modal_workflows/local_lm_pipeline.py --action plan_text_adapter_packaging
+.venv/bin/modal run modal_workflows/local_lm_pipeline.py --action run_text_adapter_packaging
+.venv/bin/modal run modal_workflows/local_lm_pipeline.py --action smoke_test_packaged_gguf
+.venv/bin/modal run modal_workflows/local_lm_pipeline.py --action check_finetuning_completion
 ```
 
 The final text job writes the LoRA adapter under
@@ -327,9 +332,19 @@ The final text job writes the LoRA adapter under
 `/vol/local-lm/reports`. `evaluate_text_adapter` now runs LoRA adapter
 generation, writes `final_text_adapter_eval.*`, and writes
 `final_text_adapter_readiness.*`. `plan_text_adapter_packaging` writes the
-reviewable merge/export/quantize plan to `final_text_adapter_packaging_plan.*`.
-GGUF merge and quantization remain a separate step after the readiness report
-passes and the packaging plan is reviewed.
+reviewable merge/export/quantize plan to `final_text_adapter_packaging_plan.*`;
+`run_text_adapter_packaging` performs the reviewed merge, F16 GGUF export, and
+Q4/Q5 quantization; `smoke_test_packaged_gguf` verifies the Q4 GGUF with
+`llama.cpp`; and `check_finetuning_completion` fails closed unless text
+training, adapter eval, packaging, GGUF smoke, vision readiness, and ASR
+contingency reports are all present.
+
+Vision readiness writes `vision_readiness.*` and validates the OpenBMB
+MiniCPM-V LoRA/QLoRA command plan without downloading or training on images
+unless `--require-images` is explicitly used by the underlying script. ASR
+contingency writes `asr_contingency.*`; alternate ASR candidates are restricted
+to NVIDIA families, must be verified locally, and stay eval-only until WER and
+unsupported-language checks pass.
 
 The Modal app copies source code into `/workspace/local-lm`, stores data and
 reports on the `local-lm-data` volume under `/vol/local-lm`, and uses

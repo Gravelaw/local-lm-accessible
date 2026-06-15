@@ -18,6 +18,7 @@ def test_standalone_hf_space_bundle_has_required_files() -> None:
     assert "sdk: gradio" in readme
     assert "app_file: app.py" in readme
     assert "gradio" in requirements
+    assert "spaces" in requirements
 
 
 def test_standalone_hf_space_avoids_cloud_runtime_calls() -> None:
@@ -36,6 +37,17 @@ def test_standalone_hf_space_avoids_cloud_runtime_calls() -> None:
     )
     for marker in blocked_markers:
         assert marker not in source
+
+
+def test_standalone_hf_space_exposes_zerogpu_samples_and_evidence() -> None:
+    source = (SPACE_ROOT / "app.py").read_text(encoding="utf-8")
+
+    assert "@spaces.GPU(duration=45)" in source
+    assert "Sample Summary" in source
+    assert "Synthetic Invoice" in source
+    assert "Broken JSON" in source
+    assert "competition_evidence" in source
+    assert "private_file_uploads_in_space" in source
 
 
 def test_prepare_hf_space_bundle_copies_upload_files(tmp_path: Path) -> None:

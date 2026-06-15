@@ -54,6 +54,7 @@ CSS = """
 .gradio-container {
   font-size: 18px;
   line-height: 1.5;
+  max-width: 1120px !important;
 }
 textarea, input, button {
   font-size: 18px !important;
@@ -61,7 +62,36 @@ textarea, input, button {
 button {
   min-height: 52px !important;
 }
+.sample-row button {
+  min-height: 48px !important;
+}
 """
+SAMPLES = {
+    "summary": {
+        "task": "summarization",
+        "text": (
+            "Local LM Accessible For Elders is a local-first assistant for older "
+            "adults and low-vision users. It summarizes public text, repairs JSON, "
+            "routes tasks, and extracts fields from synthetic receipts. Private "
+            "documents are intended for local GGUF inference only."
+        ),
+    },
+    "invoice": {
+        "task": "receipt_or_invoice_json",
+        "text": (
+            "Synthetic invoice\n"
+            "Company: Sunrise Pharmacy\n"
+            "Invoice date: 2026-06-01\n"
+            "Item: Blood pressure monitor\n"
+            "Total INR 1240.00\n"
+            "Payment status: paid"
+        ),
+    },
+    "json": {
+        "task": "json_repair",
+        "text": "{vendor: 'Sunrise Pharmacy', total: 1240.00, paid: true,}",
+    },
+}
 
 
 @dataclass(frozen=True)
@@ -263,6 +293,47 @@ def space_status() -> tuple[str, dict[str, Any]]:
     return text, payload
 
 
+def competition_evidence() -> tuple[str, dict[str, Any]]:
+    status_text, status_payload = space_status()
+    payload = {
+        **status_payload,
+        "competition_tracks": ["Backyard AI", "local-first small-model assistant"],
+        "modal_workflows": [
+            "prepare_all_data",
+            "finetune_text_nemotron",
+            "evaluate_text_adapter",
+            "run_text_adapter_packaging",
+            "smoke_test_packaged_gguf",
+            "finetune_vision",
+            "create_vision_readiness",
+            "check_asr_contingency",
+        ],
+        "runtime_privacy": {
+            "private_file_uploads_in_space": False,
+            "external_inference_apis": False,
+            "hosted_ocr": False,
+            "telemetry": False,
+        },
+    }
+    text = "\n".join(
+        [
+            status_text,
+            "",
+            "Competition evidence:",
+            "- ZeroGPU callback is present for judge-visible GPU routing.",
+            "- Text LoRA packaging and GGUF smoke workflow are tracked in Modal.",
+            "- Vision readiness and ASR contingency reports are generated before full training.",
+            "- Private documents stay out of the hosted Space.",
+        ]
+    )
+    return text, payload
+
+
+def load_sample(sample_key: str) -> tuple[str, str]:
+    sample = SAMPLES[sample_key]
+    return str(sample["task"]), str(sample["text"])
+
+
 def _auto_task(text: str) -> str:
     lowered = text.casefold()
     if lowered.strip().startswith(("{", "[")) or "broken json" in lowered:
@@ -323,8 +394,8 @@ with gr.Blocks(title=APP_TITLE, css=CSS) as demo:
         """
 # Local LM Accessible For Elders
 
-Hosted demo. Do not enter private documents. Use the published GGUF locally for
-private work.
+Hosted ZeroGPU demo for public samples only. Private documents are for the
+published local GGUF workflow, not this Space.
 """
     )
     with gr.Tab("Assistant"):
@@ -334,10 +405,41 @@ private work.
             lines=10,
             placeholder="Paste a short public sample, broken JSON, or synthetic invoice text.",
         )
+        with gr.Row(elem_classes=["sample-row"]):
+            summary_sample = gr.Button("Sample Summary")
+            invoice_sample = gr.Button("Synthetic Invoice")
+            json_sample = gr.Button("Broken JSON")
         run_button = gr.Button("Run", variant="primary")
         output = gr.Markdown(label="Output")
         payload = gr.JSON(label="Runtime payload")
+        summary_sample.click(
+            lambda: load_sample("summary"),
+            inputs=[],
+            outputs=[task, user_text],
+            show_progress="hidden",
+        )
+        invoice_sample.click(
+            lambda: load_sample("invoice"),
+            inputs=[],
+            outputs=[task, user_text],
+            show_progress="hidden",
+        )
+        json_sample.click(
+            lambda: load_sample("json"),
+            inputs=[],
+            outputs=[task, user_text],
+            show_progress="hidden",
+        )
         run_button.click(run_demo, inputs=[task, user_text], outputs=[output, payload])
+    with gr.Tab("Evidence"):
+        evidence_button = gr.Button("Show evidence", variant="primary")
+        evidence_text = gr.Markdown(label="Evidence")
+        evidence_payload = gr.JSON(label="Evidence payload")
+        evidence_button.click(
+            competition_evidence,
+            inputs=[],
+            outputs=[evidence_text, evidence_payload],
+        )
     with gr.Tab("Status"):
         status_button = gr.Button("Check status", variant="primary")
         status_text = gr.Textbox(label="Status", interactive=False)

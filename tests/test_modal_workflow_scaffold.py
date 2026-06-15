@@ -48,6 +48,10 @@ def test_modal_workflow_uses_image_volumes_and_secrets() -> None:
     assert "scripts/publish_hf_artifacts.py" in source
     assert "scripts/check_nemotron_dependencies.py" in source
     assert "scripts/preflight_finetuning_manifests.py" in source
+    assert "scripts/create_vision_readiness_report.py" in source
+    assert "scripts/check_asr_contingency.py" in source
+    assert "scripts/check_finetuning_completion.py" in source
+    assert "check_finetuning_completion" in source
     assert "llama_nemotron_nano_modal_lora.yaml" in source
     assert "nemotron_modal_prepared_lora.yaml" in source
     assert "minicpm_v_modal_document_lora.yaml" in source
