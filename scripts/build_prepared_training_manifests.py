@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import shutil
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -44,7 +43,10 @@ def build_all_manifests(
         "image_accessibility": build_empty_task_manifests(
             output_dir,
             prefix="image_accessibility",
-            reason="No approved image accessibility dataset has been downloaded under the 10 GB cap.",
+            reason=(
+                "No approved image accessibility dataset has been downloaded "
+                "under the 10 GB cap."
+            ),
         ),
     }
     report["gaps"] = collect_gaps(report)
@@ -191,7 +193,9 @@ def summarize_records(records: list[dict[str, Any]]) -> dict[str, dict[str, int]
     return {
         "region": dict(Counter(str(record.get("region", "")) for record in records)),
         "task": dict(Counter(str(record.get("task", "")) for record in records)),
-        "source_dataset": dict(Counter(str(record.get("source_dataset", "")) for record in records)),
+        "source_dataset": dict(
+            Counter(str(record.get("source_dataset", "")) for record in records)
+        ),
     }
 
 
@@ -200,7 +204,9 @@ def summarize_text_records(records: list[dict[str, Any]]) -> dict[str, dict[str,
         "region": dict(
             Counter(str(record.get("metadata", {}).get("region", "")) for record in records)
         ),
-        "task": dict(Counter(str(record.get("metadata", {}).get("task", "")) for record in records)),
+        "task": dict(
+            Counter(str(record.get("metadata", {}).get("task", "")) for record in records)
+        ),
     }
 
 

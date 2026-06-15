@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import json
 import os
+import selectors
 import shutil
 import subprocess
+import time
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +26,9 @@ RESEARCH_EVAL_PATH = REGISTRY_ROOT / "research_eval_datasets.jsonl"
 REJECTED_PATH = REGISTRY_ROOT / "rejected_datasets.jsonl"
 TASK_MAPPED_PATH = REGISTRY_ROOT / "task_mapped_datasets.jsonl"
 TEXT_MODAL_CONFIG = (
+    REMOTE_ROOT / "training" / "text" / "configs" / "llama_nemotron_nano_modal_lora.yaml"
+)
+HYBRID_NEMOTRON_MODAL_CONFIG = (
     REMOTE_ROOT / "training" / "text" / "configs" / "nemotron_modal_prepared_lora.yaml"
 )
 VISION_MODAL_CONFIG = (
@@ -128,6 +133,7 @@ def _run(
     cwd: Path = REMOTE_ROOT,
     extra_env: dict[str, str] | None = None,
     timeout_seconds: int | None = None,
+    stream_output: bool = False,
 ) -> dict[str, Any]:
     env = os.environ.copy()
     env.setdefault("HF_HOME", "/cache/huggingface")
@@ -169,6 +175,13 @@ def _run(
     )
     if extra_env:
         env.update(extra_env)
+    if stream_output:
+        return _run_streaming(
+            command,
+            cwd=cwd,
+            env=env,
+            timeout_seconds=timeout_seconds,
+        )
     try:
         completed = subprocess.run(
             command,
@@ -199,9 +212,76 @@ def _run(
     return result
 
 
+def _run_streaming(
+    command: list[str],
+    *,
+    cwd: Path,
+    env: dict[str, str],
+    timeout_seconds: int | None,
+) -> dict[str, Any]:
+    started_at = time.monotonic()
+    process = subprocess.Popen(
+        command,
+        cwd=cwd,
+        env=env,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        bufsize=1,
+    )
+    output_lines: list[str] = []
+    selector = selectors.DefaultSelector()
+    if process.stdout is None:
+        raise RuntimeError("streaming subprocess stdout was not captured")
+    selector.register(process.stdout, selectors.EVENT_READ)
+
+    timed_out = False
+    while True:
+        if timeout_seconds is not None and time.monotonic() - started_at > timeout_seconds:
+            timed_out = True
+            process.kill()
+            break
+        for key, _ in selector.select(timeout=1.0):
+            line = key.fileobj.readline()
+            if not line:
+                continue
+            output_lines.append(line)
+            print(line, end="", flush=True)
+        if process.poll() is not None:
+            for line in process.stdout.readlines():
+                output_lines.append(line)
+                print(line, end="", flush=True)
+            break
+
+    selector.close()
+    returncode = process.wait()
+    result = {
+        "command": command,
+        "stdout": "".join(output_lines),
+        "stderr": "",
+        "returncode": returncode,
+    }
+    if timed_out:
+        result["timeout_seconds"] = timeout_seconds
+        raise TimeoutError(json.dumps(result, indent=2, sort_keys=True))
+    if returncode != 0:
+        raise RuntimeError(json.dumps(result, indent=2, sort_keys=True))
+    return result
+
+
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _read_training_config(config_path: Path) -> dict[str, Any]:
+    import yaml
+
+    with config_path.open("r", encoding="utf-8") as config_file:
+        config = yaml.safe_load(config_file)
+    if not isinstance(config, dict):
+        raise ValueError(f"training config must be a mapping: {config_path}")
+    return config
 
 
 def _cuda_extension_build_env() -> dict[str, str]:
@@ -486,35 +566,41 @@ def check_training_toolchain() -> dict[str, Any]:
     secrets=[HF_SECRET],
     gpu="A10G",
     timeout=60 * 90,
-    retries=1,
+    retries=0,
 )
-def prepare_nemotron_dependencies(timeout_seconds: int = 60 * 45) -> dict[str, Any]:
+def prepare_nemotron_dependencies(
+    timeout_seconds: int = 60 * 45,
+    install_mamba: bool = False,
+) -> dict[str, Any]:
     cuda_build_env = _cuda_extension_build_env()
     cuda_toolchain = _run(
         ["python", "scripts/check_cuda_toolchain.py"],
         extra_env=cuda_build_env,
     )
-    mamba_install = _run(
-        [
-            "python",
-            "-m",
-            "pip",
-            "install",
-            "causal-conv1d>=1.4",
-            "mamba-ssm>=2.2",
-            "--no-build-isolation",
-        ],
-        extra_env=cuda_build_env,
-        timeout_seconds=timeout_seconds,
-    )
-    dependency_check = _run(
-        ["python", "scripts/check_nemotron_dependencies.py"],
-        extra_env=cuda_build_env,
-    )
+    mamba_install = None
+    dependency_command = ["python", "scripts/check_nemotron_dependencies.py"]
+    if install_mamba:
+        mamba_install = _run(
+            [
+                "python",
+                "-m",
+                "pip",
+                "install",
+                "causal-conv1d>=1.4",
+                "mamba-ssm>=2.2",
+                "--no-build-isolation",
+            ],
+            extra_env=cuda_build_env,
+            timeout_seconds=timeout_seconds,
+            stream_output=True,
+        )
+        dependency_command.append("--include-mamba")
+    dependency_check = _run(dependency_command, extra_env=cuda_build_env)
     report = {
         "cuda_toolchain": cuda_toolchain,
         "mamba_install": mamba_install,
         "dependency_check": dependency_check,
+        "install_mamba": install_mamba,
         "timeout_seconds": timeout_seconds,
     }
     _write_json(NEMOTRON_DEPENDENCY_REPORT, report)
@@ -543,19 +629,6 @@ def finetune_text_nemotron(dry_run: bool = False, limit: int = 16) -> dict[str, 
         ["python", "scripts/check_cuda_toolchain.py"],
         extra_env=cuda_build_env,
     )
-    mamba_install = _run(
-        [
-            "python",
-            "-m",
-            "pip",
-            "install",
-            "causal-conv1d>=1.4",
-            "mamba-ssm>=2.2",
-            "--no-build-isolation",
-        ],
-        extra_env=cuda_build_env,
-        timeout_seconds=60 * 45,
-    )
     dependency_check = _run(
         ["python", "scripts/check_nemotron_dependencies.py"],
         extra_env=cuda_build_env,
@@ -571,14 +644,19 @@ def finetune_text_nemotron(dry_run: bool = False, limit: int = 16) -> dict[str, 
     result = _run(command)
     finalization: dict[str, Any] | None = None
     if not dry_run:
+        config = _read_training_config(TEXT_MODAL_CONFIG)
+        output_dir = Path(str(config["training"]["output_dir"]))
+        base_model = str(config["model"]["base_model"])
         finalization = _run(
             [
                 "python",
                 "scripts/finalize_text_adapter.py",
                 "--adapter-dir",
-                str(Path("/vol/local-lm/training/text/nemotron_modal_prepared_lora")),
+                str(output_dir),
                 "--base-model",
-                "nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16",
+                base_model,
+                "--run-name",
+                output_dir.name,
                 "--train-file",
                 str(TRAINING_MANIFEST_ROOT / "text_sft_train.jsonl"),
                 "--eval-file",
@@ -593,7 +671,7 @@ def finetune_text_nemotron(dry_run: bool = False, limit: int = 16) -> dict[str, 
     return {
         "preflight": preflight,
         "cuda_toolchain": cuda_toolchain,
-        "mamba_install": mamba_install,
+        "mamba_install": None,
         "dependency_check": dependency_check,
         "training": result,
         "finalization": finalization,
@@ -661,6 +739,7 @@ def main(
     max_dataset_size_gb: float = 10.0,
     dry_run: bool = True,
     dependency_timeout_seconds: int = 60 * 45,
+    install_mamba_dependencies: bool = False,
 ) -> None:
     if action == "ingest_data":
         result = ingest_data.remote(targets=targets, max_dataset_size_gb=max_dataset_size_gb)
@@ -684,7 +763,8 @@ def main(
         result = check_training_toolchain.remote()
     elif action == "prepare_nemotron_dependencies":
         result = prepare_nemotron_dependencies.remote(
-            timeout_seconds=dependency_timeout_seconds
+            timeout_seconds=dependency_timeout_seconds,
+            install_mamba=install_mamba_dependencies,
         )
     elif action == "evaluate_text_adapter":
         result = evaluate_text_adapter.remote()

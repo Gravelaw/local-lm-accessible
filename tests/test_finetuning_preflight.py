@@ -14,7 +14,7 @@ from training.text.train_nemotron_lora import load_jsonl as load_text_jsonl
 from training.vision.prepare_dataset import load_jsonl as load_vision_jsonl
 from training.vision.train_minicpm_v_lora import load_config as load_vision_config
 
-TEXT_CONFIG = Path("training/text/configs/nemotron_modal_prepared_lora.yaml")
+TEXT_CONFIG = Path("training/text/configs/llama_nemotron_nano_modal_lora.yaml")
 VISION_CONFIG = Path("training/vision/configs/minicpm_v_modal_document_lora.yaml")
 TEXT_SAMPLE = Path("training/text/sample_data/router_summary_32.jsonl")
 TEXT_EVAL_SAMPLE = Path("training/text/sample_data/router_summary_eval_8.jsonl")
@@ -34,6 +34,7 @@ def test_modal_text_config_uses_volume_prepared_manifests() -> None:
         == "/vol/local-lm/data/processed/training/text_sft_validation.jsonl"
     )
     assert config["training"]["output_dir"].startswith("/vol/local-lm/training/text/")
+    assert config["model"]["base_model"] == "nvidia/Llama-3.1-Nemotron-Nano-8B-v1"
     assert config["training"]["backend"] == "hf_trl_peft"
     assert "unsloth" in config["training"]["optional_backend_candidates"]
     assert config["training"]["max_steps"] == 20

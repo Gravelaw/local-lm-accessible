@@ -30,8 +30,10 @@ def test_modal_workflow_uses_image_volumes_and_secrets() -> None:
     assert "prepare_nemotron_dependencies" in source
     assert "evaluate_text_adapter" in source
     assert "scripts/finalize_text_adapter.py" in source
+    assert "--run-name" in source
     assert "scripts/check_nemotron_dependencies.py" in source
     assert "scripts/preflight_finetuning_manifests.py" in source
+    assert "llama_nemotron_nano_modal_lora.yaml" in source
     assert "nemotron_modal_prepared_lora.yaml" in source
     assert "minicpm_v_modal_document_lora.yaml" in source
     assert "mamba-ssm" in source
@@ -43,7 +45,14 @@ def test_modal_workflow_uses_image_volumes_and_secrets() -> None:
     assert "CMAKE_CUDA_HOST_COMPILER" in source
     assert "torch==2.12.0" in source
     assert "LD_LIBRARY_PATH" in source
-    assert "timeout_seconds=60 * 45" in source
+    assert "timeout_seconds: int = 60 * 45" in source
+    assert "stream_output=True" in source
+    assert "selectors.DefaultSelector" in source
+    assert "def prepare_nemotron_dependencies" in source
+    assert "timeout=60 * 90" in source
+    assert "retries=0" in source
+    assert "install_mamba_dependencies: bool = False" in source
+    assert "--include-mamba" in source
 
 
 def test_modalignore_excludes_local_artifacts() -> None:
@@ -59,8 +68,13 @@ def test_modal_pipeline_tracks_backend_and_gpu_escalation() -> None:
     config = yaml.safe_load(Path("configs/modal_pipeline.yaml").read_text(encoding="utf-8"))
     finetuning = config["finetuning"]
 
+    assert finetuning["text_config"] == "training/text/configs/llama_nemotron_nano_modal_lora.yaml"
     assert finetuning["default_text_backend"] == "hf_trl_peft"
     assert finetuning["optional_text_backends"]["unsloth"]["status"] == "candidate"
+    assert (
+        finetuning["optional_text_backends"]["hybrid_mamba_nemotron"]["status"]
+        == "optional_blocked_by_native_wheel_build"
+    )
     assert finetuning["gpu_upgrade_order"] == [
         "A10G",
         "A100-40GB",
