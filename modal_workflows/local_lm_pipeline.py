@@ -39,6 +39,10 @@ VISION_PREFLIGHT_REPORT = REPORTS_DIR / "fine_tuning_vision_preflight.json"
 NEMOTRON_DEPENDENCY_REPORT = REPORTS_DIR / "nemotron_dependency_build.json"
 FINAL_TEXT_ADAPTER_EVAL_JSON = REPORTS_DIR / "final_text_adapter_eval.json"
 FINAL_TEXT_ADAPTER_EVAL_MD = REPORTS_DIR / "final_text_adapter_eval.md"
+FINAL_TEXT_ADAPTER_READINESS_JSON = REPORTS_DIR / "final_text_adapter_readiness.json"
+FINAL_TEXT_ADAPTER_READINESS_MD = REPORTS_DIR / "final_text_adapter_readiness.md"
+FINAL_TEXT_ADAPTER_PACKAGING_PLAN_JSON = REPORTS_DIR / "final_text_adapter_packaging_plan.json"
+FINAL_TEXT_ADAPTER_PACKAGING_PLAN_MD = REPORTS_DIR / "final_text_adapter_packaging_plan.md"
 FINAL_FINE_TUNING_SUMMARY_JSON = REPORTS_DIR / "final_finetuning_summary.json"
 FINAL_FINE_TUNING_SUMMARY_MD = REPORTS_DIR / "final_finetuning_summary.md"
 
@@ -687,17 +691,77 @@ def finetune_text_nemotron(dry_run: bool = False, limit: int = 16) -> dict[str, 
     retries=1,
 )
 def evaluate_text_adapter() -> dict[str, Any]:
+    config = _read_training_config(TEXT_MODAL_CONFIG)
+    output_dir = Path(str(config["training"]["output_dir"]))
+    base_model = str(config["model"]["base_model"])
     command = [
         "python",
         "training/text/eval_text_adapter.py",
         "--input",
         str(TRAINING_MANIFEST_ROOT / "text_sft_validation.jsonl"),
+        "--adapter-dir",
+        str(output_dir),
+        "--base-model",
+        base_model,
+        "--limit",
+        "8",
         "--report-json",
         str(FINAL_TEXT_ADAPTER_EVAL_JSON),
         "--report-md",
         str(FINAL_TEXT_ADAPTER_EVAL_MD),
     ]
     result = _run(command)
+    readiness = _run(
+        [
+            "python",
+            "scripts/check_text_adapter_release_readiness.py",
+            "--adapter-dir",
+            str(output_dir),
+            "--eval-report",
+            str(FINAL_TEXT_ADAPTER_EVAL_JSON),
+            "--output-json",
+            str(FINAL_TEXT_ADAPTER_READINESS_JSON),
+            "--output-md",
+            str(FINAL_TEXT_ADAPTER_READINESS_MD),
+        ]
+    )
+    _commit_volumes()
+    return {"adapter_eval": result, "readiness": readiness}
+
+
+@app.function(
+    image=training_image,
+    volumes={str(VOLUME_ROOT): DATA_VOLUME, "/cache": CACHE_VOLUME},
+    secrets=[HF_SECRET],
+    timeout=60 * 10,
+    retries=1,
+)
+def plan_text_adapter_packaging() -> dict[str, Any]:
+    config = _read_training_config(TEXT_MODAL_CONFIG)
+    output_dir = Path(str(config["training"]["output_dir"]))
+    merged_dir = VOLUME_ROOT / "training" / "text" / "llama_nemotron_nano_merged_hf"
+    f16_gguf = VOLUME_ROOT / "models" / "text" / "llama-nemotron-nano-f16.gguf"
+    quantized_dir = VOLUME_ROOT / "models" / "text"
+    result = _run(
+        [
+            "python",
+            "scripts/create_text_adapter_packaging_plan.py",
+            "--readiness-report",
+            str(FINAL_TEXT_ADAPTER_READINESS_JSON),
+            "--adapter-dir",
+            str(output_dir),
+            "--merged-dir",
+            str(merged_dir),
+            "--f16-gguf",
+            str(f16_gguf),
+            "--quantized-dir",
+            str(quantized_dir),
+            "--output-json",
+            str(FINAL_TEXT_ADAPTER_PACKAGING_PLAN_JSON),
+            "--output-md",
+            str(FINAL_TEXT_ADAPTER_PACKAGING_PLAN_MD),
+        ]
+    )
     _commit_volumes()
     return result
 
@@ -768,6 +832,8 @@ def main(
         )
     elif action == "evaluate_text_adapter":
         result = evaluate_text_adapter.remote()
+    elif action == "plan_text_adapter_packaging":
+        result = plan_text_adapter_packaging.remote()
     else:
         raise ValueError(f"unsupported action: {action}")
     print(json.dumps(result, indent=2, sort_keys=True))

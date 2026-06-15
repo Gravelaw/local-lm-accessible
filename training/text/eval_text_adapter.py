@@ -42,6 +42,80 @@ def baseline_predictions_from_records(records: list[dict[str, Any]]) -> list[dic
     return predictions
 
 
+def adapter_predictions_from_records(
+    records: list[dict[str, Any]],
+    *,
+    base_model: str,
+    adapter_dir: Path,
+    max_new_tokens: int = 192,
+    limit: int | None = None,
+    local_files_only: bool = False,
+) -> list[dict[str, Any]]:
+    examples = validate_examples(records[:limit] if limit is not None else records)
+    if not adapter_dir.exists():
+        raise FileNotFoundError(f"missing adapter directory: {adapter_dir}")
+
+    import torch
+    from peft import PeftModel
+    from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+
+    tokenizer = AutoTokenizer.from_pretrained(
+        base_model,
+        local_files_only=local_files_only,
+        trust_remote_code=False,
+        use_fast=True,
+    )
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    quantization_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_compute_dtype=torch.bfloat16,
+        bnb_4bit_use_double_quant=True,
+    )
+    model = AutoModelForCausalLM.from_pretrained(
+        base_model,
+        device_map="auto",
+        local_files_only=local_files_only,
+        quantization_config=quantization_config,
+        torch_dtype=torch.bfloat16 if torch.cuda.is_available() else torch.float32,
+        trust_remote_code=False,
+    )
+    model = PeftModel.from_pretrained(
+        model,
+        adapter_dir,
+        is_trainable=False,
+        local_files_only=True,
+    )
+    model.eval()
+
+    predictions: list[dict[str, Any]] = []
+    for index, example in enumerate(examples, start=1):
+        prompt = render_prompt_text(example, tokenizer)
+        encoded = tokenizer(prompt, return_tensors="pt")
+        encoded = {key: value.to(model.device) for key, value in encoded.items()}
+        with torch.inference_mode():
+            output_ids = model.generate(
+                **encoded,
+                do_sample=False,
+                max_new_tokens=max_new_tokens,
+                pad_token_id=tokenizer.pad_token_id,
+                eos_token_id=tokenizer.eos_token_id,
+            )
+        prompt_token_count = int(encoded["input_ids"].shape[-1])
+        generated_ids = output_ids[0][prompt_token_count:]
+        prediction = tokenizer.decode(generated_ids, skip_special_tokens=True).strip()
+        predictions.append(
+            prediction_from_example(
+                example,
+                prediction,
+                example_id=f"adapter-{index:04d}",
+                prediction_source="lora_adapter_generation",
+            )
+        )
+    return predictions
+
+
 def prediction_from_example(
     example: TextSFTExample,
     prediction: str,
@@ -163,9 +237,32 @@ def main() -> None:
     )
     parser.add_argument("--report-json", type=Path, default=Path("reports/text_eval.json"))
     parser.add_argument("--report-md", type=Path, default=Path("reports/text_eval.md"))
+    parser.add_argument("--adapter-dir", type=Path)
+    parser.add_argument("--base-model")
+    parser.add_argument("--limit", type=int)
+    parser.add_argument("--max-new-tokens", type=int, default=192)
+    parser.add_argument(
+        "--local-files-only",
+        action="store_true",
+        help="Use only locally cached base-model files.",
+    )
     args = parser.parse_args()
 
-    metrics = evaluate_records(load_jsonl(args.input))
+    records = load_jsonl(args.input)
+    if args.adapter_dir is None:
+        predictions = baseline_predictions_from_records(records)
+    else:
+        if not args.base_model:
+            raise ValueError("--base-model is required when --adapter-dir is set")
+        predictions = adapter_predictions_from_records(
+            records,
+            base_model=args.base_model,
+            adapter_dir=args.adapter_dir,
+            max_new_tokens=args.max_new_tokens,
+            limit=args.limit,
+            local_files_only=args.local_files_only,
+        )
+    metrics = evaluate_predictions(predictions)
     write_reports(metrics, args.report_json, args.report_md)
     print(json.dumps(metrics, indent=2, sort_keys=True))
 

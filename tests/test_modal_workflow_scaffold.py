@@ -31,6 +31,10 @@ def test_modal_workflow_uses_image_volumes_and_secrets() -> None:
     assert "evaluate_text_adapter" in source
     assert "scripts/finalize_text_adapter.py" in source
     assert "--run-name" in source
+    assert "scripts/check_text_adapter_release_readiness.py" in source
+    assert "FINAL_TEXT_ADAPTER_READINESS_JSON" in source
+    assert "plan_text_adapter_packaging" in source
+    assert "scripts/create_text_adapter_packaging_plan.py" in source
     assert "scripts/check_nemotron_dependencies.py" in source
     assert "scripts/preflight_finetuning_manifests.py" in source
     assert "llama_nemotron_nano_modal_lora.yaml" in source

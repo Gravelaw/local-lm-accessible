@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from training.text.eval_text_adapter import (
+    adapter_predictions_from_records,
     baseline_predictions_from_records,
     evaluate_predictions,
     evaluate_records,
@@ -198,3 +199,14 @@ def test_text_eval_baseline_predictions_are_explicitly_marked() -> None:
 
     assert predictions[0]["prediction_source"] == "assistant_label_baseline"
     assert metrics["prediction_sources"] == ["assistant_label_baseline"]
+
+
+def test_text_eval_adapter_predictions_reject_missing_adapter(tmp_path: Path) -> None:
+    records = load_jsonl(SAMPLE_PATH, limit=1)
+
+    with pytest.raises(FileNotFoundError, match="missing adapter directory"):
+        adapter_predictions_from_records(
+            records,
+            base_model="nvidia/Llama-3.1-Nemotron-Nano-8B-v1",
+            adapter_dir=tmp_path / "missing-adapter",
+        )

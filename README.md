@@ -283,15 +283,14 @@ Run fine-tuning dry runs on Modal GPU compute:
 ```
 
 The default text fine-tuning backend is Hugging Face TRL `SFTTrainer` with PEFT
-LoRA/QLoRA because it is already covered by local tests. Unsloth is tracked as a
-candidate acceleration backend for Nemotron 3 after dependency smoke tests pass.
-Dry-run and preflight use the lightweight HF/TRL image. Real Nemotron training
-has an explicit Mamba install step because that model family requires native
-CUDA extension dependencies.
-The native-extension step runs a CUDA toolchain preflight first and pins the
-CUDA host compiler to `/usr/bin/g++` through `CUDAHOSTCXX`, `CMAKE_ARGS`,
-`CUDAFLAGS`, and `NVCC_PREPEND_FLAGS` so CUDA 13 does not accidentally select an
-unsupported `clang++`.
+LoRA/QLoRA because it is already covered by local tests. The default Modal text
+model is `nvidia/Llama-3.1-Nemotron-Nano-8B-v1`, which avoids the
+`causal-conv1d`/`mamba-ssm` source-build blocker seen with the hybrid Mamba
+Nemotron path. Unsloth remains a candidate acceleration backend after dependency
+smoke tests pass. The optional native-extension step runs a CUDA toolchain
+preflight first and pins the CUDA host compiler to `/usr/bin/g++` through
+`CUDAHOSTCXX`, `CMAKE_ARGS`, `CUDAFLAGS`, and `NVCC_PREPEND_FLAGS` so CUDA 13
+does not accidentally select an unsupported `clang++`.
 If the capped job is memory- or throughput-bound, increase Modal GPU class in
 this order: `A10G`, `A100-40GB`, `A100-80GB`, `H100`, then `H200`.
 
@@ -303,13 +302,18 @@ pass:
 .venv/bin/modal run modal_workflows/local_lm_pipeline.py --action prepare_nemotron_dependencies
 .venv/bin/modal run modal_workflows/local_lm_pipeline.py --action finetune_text --no-dry-run
 .venv/bin/modal run modal_workflows/local_lm_pipeline.py --action evaluate_text_adapter
+.venv/bin/modal run modal_workflows/local_lm_pipeline.py --action plan_text_adapter_packaging
 ```
 
 The final text job writes the LoRA adapter under
-`/vol/local-lm/training/text/nemotron_modal_prepared_lora`, emits
+`/vol/local-lm/training/text/llama_nemotron_nano_modal_lora`, emits
 `adapter_manifest.json` with checksum metadata, and writes final reports under
-`/vol/local-lm/reports`. GGUF merge and quantization remain a separate approval
-step after adapter evaluation passes.
+`/vol/local-lm/reports`. `evaluate_text_adapter` now runs LoRA adapter
+generation, writes `final_text_adapter_eval.*`, and writes
+`final_text_adapter_readiness.*`. `plan_text_adapter_packaging` writes the
+reviewable merge/export/quantize plan to `final_text_adapter_packaging_plan.*`.
+GGUF merge and quantization remain a separate step after the readiness report
+passes and the packaging plan is reviewed.
 
 The Modal app copies source code into `/workspace/local-lm`, stores data and
 reports on the `local-lm-data` volume under `/vol/local-lm`, and uses
